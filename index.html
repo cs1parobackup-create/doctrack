@@ -12,14 +12,14 @@
         .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
         h1 { color: #007bff; text-align: center; margin-bottom: 5px; }
         
-        /* Header for Username and Controls */
+        /* Header for Office Name and Controls */
         .app-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 2px solid #007bff; margin-bottom: 20px; }
         .app-header p { margin: 0; font-weight: bold; color: #333; }
         .app-header span { color: #dc3545; }
         .logout-btn { background-color: #6c757d; color: white; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .logout-btn:hover { background-color: #5a6268; }
 
-        /* Login Screen Styling (Retained) */
+        /* Login Screen Styling */
         #login-container {
             display: none; 
             justify-content: center;
@@ -37,13 +37,15 @@
             width: 90%;
         }
         .login-box h2 { color: #007bff; margin-top: 0; }
-        .login-box input {
+        /* Style for the new select input */
+        .login-box select {
             width: 100%;
             padding: 12px;
             margin: 15px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
+            font-size: 16px;
         }
         .login-box button {
             background-color: #28a745;
@@ -115,8 +117,16 @@
 <div id="login-container">
     <div class="login-box">
         <h2>Document Tracker Access</h2>
-        <p>Please enter your **Username** to use the system and log changes.</p>
-        <input type="text" id="usernameInput" placeholder="Enter your name or initials (e.g., JDELA CRUZ)">
+        <p>Please select your **Office** to use the system and log changes.</p>
+        <select id="officeSelect" required>
+            <option value="" disabled selected>Select Office</option>
+            <option value="PARPO">PARPO</option>
+            <option value="STOD">STOD</option>
+            <option value="LEGAL">LEGAL</option>
+            <option value="LTSP">LTSP</option>
+            <option value="RECORDS">RECORDS</option>
+            <option value="ARBDSP">ARBDSP</option>
+        </select>
         <button onclick="attemptLogin()">Log In</button>
         <p style="font-size: 10px; color: #dc3545; margin-top: 20px;">
             ⚠️ This is for internal logging only.
@@ -239,11 +249,12 @@
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
 
-    // --- Login/Session Functions (Unchanged) ---
+    // --- Login/Session Functions ---
     function checkLogin() {
-        const loggedInUser = sessionStorage.getItem('docTrackerUser');
-        if (loggedInUser) {
-            document.getElementById('loggedInUserDisplay').textContent = loggedInUser;
+        // Now checks for the logged-in office
+        const loggedInOffice = sessionStorage.getItem('docTrackerUser');
+        if (loggedInOffice) {
+            document.getElementById('loggedInUserDisplay').textContent = loggedInOffice;
             showApp();
         } else {
             showLogin();
@@ -258,13 +269,14 @@
         document.getElementById('app-container').style.display = 'none';
     }
     function attemptLogin() {
-        const username = document.getElementById('usernameInput').value.trim().toUpperCase();
-        if (username) {
-            sessionStorage.setItem('docTrackerUser', username);
-            document.getElementById('loggedInUserDisplay').textContent = username;
+        // Gets value from the new SELECT dropdown
+        const office = document.getElementById('officeSelect').value; 
+        if (office) {
+            sessionStorage.setItem('docTrackerUser', office); // Stores the office name
+            document.getElementById('loggedInUserDisplay').textContent = office;
             showApp();
         } else {
-            alert("Please enter a username.");
+            alert("Please select your office.");
         }
     }
     function logout() {
@@ -274,6 +286,7 @@
         }
     }
     function getCurrentUser() {
+        // Returns the logged-in office name
         return sessionStorage.getItem('docTrackerUser') || 'UNKNOWN';
     }
 
@@ -313,7 +326,7 @@
         }
     }
 
-    // --- Tracking ID Generation Logic (New) ---
+    // --- Tracking ID Generation Logic (Unchanged from previous step) ---
 
     function getCurrentDateOnly() {
         // Formats date as YYYY-MM-DD
@@ -350,7 +363,7 @@
         return `${today}-${sequencePart}-${timePart}`;
     }
     
-    // --- Barcode Functions (Re-introduced) ---
+    // --- Barcode Functions (Unchanged) ---
 
     function generateBarcodeSVG(id) {
         return `<svg id="barcode-${id}"></svg>`;
@@ -362,7 +375,7 @@
                 JsBarcode(`#barcode-${id}`, id, {
                     format: "CODE128", 
                     displayValue: false,
-                    width: 1.5, // slightly wider for complex ID
+                    width: 1.5, 
                     height: 50
                 });
             } catch (e) {
@@ -384,7 +397,6 @@
             return false;
         }
         
-        // *** AUTOMATICALLY GENERATE UNIQUE ID ***
         const docId = generateTrackingID();
 
         const newDoc = {
@@ -485,7 +497,7 @@
     }
 
 
-    // --- Table Rendering ---
+    // --- Table Rendering (Unchanged) ---
 
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
