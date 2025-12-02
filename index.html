@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated Tracker (YYYY-MM-SSSSS)</title>
+    <title>Automated Tracker (YYYY-SSSSS)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
@@ -13,7 +13,15 @@
         h1 { color: #007bff; text-align: center; margin-bottom: 5px; }
         
         /* Header for Office Name and Controls */
-        .app-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 2px solid #007bff; margin-bottom: 20px; }
+        .app-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 10px 0; 
+            border-bottom: 2px solid #007bff; 
+            margin-bottom: 20px; 
+            font-size: 1.1em;
+        }
         .app-header p { margin: 0; font-weight: bold; color: #333; }
         .app-header span { color: #dc3545; }
         .logout-btn { background-color: #6c757d; color: white; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
@@ -37,10 +45,10 @@
             width: 90%;
         }
         .login-box h2 { color: #007bff; margin-top: 0; }
-        .login-box select {
+        .login-box select, .login-box input {
             width: 100%;
             padding: 12px;
-            margin: 15px 0;
+            margin: 8px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
@@ -50,6 +58,7 @@
             background-color: #28a745;
             color: white;
             padding: 12px 25px;
+            margin-top: 15px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -124,7 +133,10 @@
 <div id="login-container">
     <div class="login-box">
         <h2>Document Tracker Access</h2>
-        <p>Please select your **Office** to use the system and log changes.</p>
+        <p>Please enter your name and select your office to begin.</p>
+        
+        <input type="text" id="nameInput" placeholder="Enter Your Name (e.g., J. Dela Cruz)" required>
+        
         <select id="officeSelect" required>
             <option value="" disabled selected>Select Office</option>
             <option value="PARPO">PARPO</option>
@@ -133,7 +145,8 @@
             <option value="LTSP">LTSP</option>
             <option value="RECORDS">RECORDS</option>
             <option value="ARBDSP">ARBDSP</option>
-        </select>
+            <option value="All Offices">All Offices (Admin View)</option> </select>
+        
         <button onclick="attemptLogin()">Log In</button>
         <p style="font-size: 10px; color: #dc3545; margin-top: 20px;">
             ⚠️ This is for internal logging only.
@@ -145,9 +158,9 @@
     <div class="container">
         
         <div class="app-header">
-            <h1 style="margin: 0;">Automated Document Tracker 📄 (ID Format: YYYY-MM-SSSSS)</h1>
+            <h1 style="margin: 0;">Automated Document Tracker 📄 (ID Format: YYYY-SSSSS)</h1>
             <p>
-                Logged in as: <span id="loggedInUserDisplay">N/A</span> 
+                User: <span id="loggedInUserDisplay">N/A</span> | Office: <span id="loggedInOfficeDisplay" style="color: #007bff;">N/A</span>
                 <button class="logout-btn" onclick="logout()">Log Out</button>
             </p>
         </div>
@@ -157,8 +170,8 @@
 
             <div class="action-controls">
                 <div class="input-group">
-                    <label for="docId">Enter Full Tracking ID to Update/Release (e.g., YYYY-MM-SSSSS):</label>
-                    <input type="text" id="docId" placeholder="e.g., 2025-12-00001">
+                    <label for="docId">Enter Full Tracking ID to Update/Release (e.g., YYYY-SSSSS):</label>
+                    <input type="text" id="docId" placeholder="e.g., 2026-00001">
                 </div>
                 
                 <div class="action-buttons">
@@ -223,7 +236,7 @@
             </div>
         </div>
 
-        <h2>Document Log</h2>
+        <h2 id="tableHeader">Document Log (Showing Files for Your Office)</h2>
         
         <div class="persistence-controls">
             <button id="saveDataBtn" onclick="manualSaveDocuments()">Manually Save Log 💾</button>
@@ -233,7 +246,7 @@
         <table id="documentTable">
             <thead>
                 <tr>
-                    <th>Tracking ID (YYYY-MM-SSSSS)</th>
+                    <th>Tracking ID (YYYY-SSSSS)</th>
                     <th>Barcode</th>
                     <th>Type</th>
                     <th>Source Office</th>
@@ -252,46 +265,71 @@
 
 <script>
     // --- Data Storage Keys ---
-    const COUNTER_KEY = 'docTrackerSequenceMonthly'; // Key now checks monthly reset
+    const COUNTER_KEY = 'docTrackerSequenceAnnual'; // Key now checks annual reset
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
 
-    // --- Login/Session Functions (Unchanged) ---
+    // --- Login/Session Functions (UPDATED) ---
     function checkLogin() {
-        const loggedInOffice = sessionStorage.getItem('docTrackerUser');
-        if (loggedInOffice) {
-            document.getElementById('loggedInUserDisplay').textContent = loggedInOffice;
+        // Retrieve both name and office from session storage
+        const loggedInName = sessionStorage.getItem('docTrackerName');
+        const loggedInOffice = sessionStorage.getItem('docTrackerOffice');
+
+        if (loggedInName && loggedInOffice) {
+            document.getElementById('loggedInUserDisplay').textContent = loggedInName;
+            document.getElementById('loggedInOfficeDisplay').textContent = loggedInOffice;
+            
+            // Set the dynamic table header
+            const headerText = (loggedInOffice === 'All Offices') 
+                ? "Document Log (Showing ALL Files - Admin View)" 
+                : `Document Log (Showing Files for ${loggedInOffice})`;
+            document.getElementById('tableHeader').textContent = headerText;
+            
             showApp();
         } else {
             showLogin();
         }
     }
+    
     function showApp() {
         document.getElementById('login-container').style.display = 'none';
         document.getElementById('app-container').style.display = 'block';
     }
+    
     function showLogin() {
         document.getElementById('login-container').style.display = 'flex';
         document.getElementById('app-container').style.display = 'none';
     }
+    
     function attemptLogin() {
+        const name = document.getElementById('nameInput').value.trim();
         const office = document.getElementById('officeSelect').value; 
-        if (office) {
-            sessionStorage.setItem('docTrackerUser', office); 
-            document.getElementById('loggedInUserDisplay').textContent = office;
-            showApp();
+
+        if (name && office) {
+            sessionStorage.setItem('docTrackerName', name); 
+            sessionStorage.setItem('docTrackerOffice', office); 
+            
+            // Re-run checkLogin to update displays and filters
+            checkLogin();
         } else {
-            alert("Please select your office.");
+            alert("Please enter your name and select your office.");
         }
     }
+    
     function logout() {
         if (confirm("Are you sure you want to log out?")) {
-            sessionStorage.removeItem('docTrackerUser');
+            sessionStorage.removeItem('docTrackerName');
+            sessionStorage.removeItem('docTrackerOffice');
             showLogin();
         }
     }
+    
     function getCurrentUser() {
-        return sessionStorage.getItem('docTrackerUser') || 'UNKNOWN';
+        return sessionStorage.getItem('docTrackerName') || 'UNKNOWN';
+    }
+    
+    function getCurrentOffice() {
+        return sessionStorage.getItem('docTrackerOffice') || 'UNKNOWN';
     }
 
     // --- Persistence Functions (Unchanged) ---
@@ -330,25 +368,19 @@
         }
     }
 
-    // --- Tracking ID Generation Logic (Monthly Reset) ---
+    // --- Tracking ID Generation Logic (UPDATED for YYYY-SSSSS) ---
 
-    function getCurrentYearMonth() {
-        const date = new Date();
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        return `${year}-${month}`; // YYYY-MM
+    function getCurrentYear() {
+        return new Date().getFullYear().toString(); // YYYY
     }
 
     function getSequence() {
-        const currentMonthYear = getCurrentYearMonth(); 
+        const currentYear = getCurrentYear(); 
         let sequenceData = JSON.parse(localStorage.getItem(COUNTER_KEY));
         
-        // Use the current date for time-based components
-        const currentDate = new Date();
-        
-        if (!sequenceData || sequenceData.monthYear !== currentMonthYear) {
-            // Reset counter if storage is empty or month/year has changed
-            sequenceData = { monthYear: currentMonthYear, sequence: 0 };
+        if (!sequenceData || sequenceData.year !== currentYear) {
+            // Reset counter if storage is empty or year has changed (Annual Reset)
+            sequenceData = { year: currentYear, sequence: 0 };
         }
 
         sequenceData.sequence++;
@@ -358,27 +390,28 @@
     }
 
     function generateTrackingID() {
-        const currentMonthYear = getCurrentYearMonth(); // YYYY-MM
+        const currentYear = getCurrentYear(); // YYYY
         const sequencePart = getSequence(); // SSSSS
 
-        // Format: YYYY-MM-SSSSS
-        return `${currentMonthYear}-${sequencePart}`;
+        // Format: YYYY-SSSSS
+        return `${currentYear}-${sequencePart}`;
     }
     
-    // --- Barcode Functions (UPDATED FOR 4-DIGIT DISPLAY) ---
+    // --- Barcode Functions (Updated to use YYYY-SSSSS split) ---
 
     function generateBarcodeSVG(id) {
         // Find the sequence part (SSSSS)
         const parts = id.split('-');
         let simpleId = 'N/A';
         
-        if (parts.length === 3) {
-            const sequence5Digit = parts[2]; // e.g., "00005"
+        // If the ID is valid (e.g., 2026-00001)
+        if (parts.length === 2) {
+            const sequence5Digit = parts[1]; // e.g., "00001"
             // Get the last 4 digits
-            simpleId = sequence5Digit.slice(-4); // e.g., "0005"
+            simpleId = sequence5Digit.slice(-4); // e.g., "0001"
         }
         
-        // Encodes the FULL ID (YYYY-MM-SSSSS) but displays the simple 4-digit sequence
+        // Encodes the FULL ID (YYYY-SSSSS) but displays the simple 4-digit sequence
         return `<svg id="barcode-${id}"></svg><span class="simple-id">${simpleId}</span>`;
     }
 
@@ -426,7 +459,8 @@
             dateReleased: '',
             forwarderOffice: forwarder, 
             status: "Received",
-            loggedBy: getCurrentUser() 
+            loggedBy: getCurrentUser(), // Logged by Name
+            loggedOffice: getCurrentOffice() // Logged by Office
         };
 
         documents.push(newDoc);
@@ -434,11 +468,11 @@
         saveDocuments(); 
         displayDocuments();
 
-        alert(`✅ NEW Document successfully logged by ${getCurrentUser()}! Generated Tracking ID: ${docId}`);
+        alert(`✅ NEW Document successfully logged by ${getCurrentUser()} (${getCurrentOffice()})! Generated Tracking ID: ${docId}`);
         return true;
     }
 
-    // --- Action Logic (New Document / Release) (Unchanged) ---
+    // --- Action Logic (Updated to use getCurrentOffice for logging) ---
 
     function handleAction(actionType) {
         const docIdInput = document.getElementById('docId');
@@ -473,6 +507,7 @@
                 return;
             }
             
+            // Use the list of offices defined in the New Document Details form
             const officeSelect = document.getElementById('forwarderOffice');
             const options = Array.from(officeSelect.options).filter(opt => opt.value !== '').map(opt => opt.value);
             const officeList = options.join('\n- ');
@@ -488,8 +523,9 @@
                     doc.forwarderOffice = validOffice; 
                     doc.status = 'Released';
                     doc.loggedBy = getCurrentUser(); 
+                    doc.loggedOffice = getCurrentOffice();
                     saveDocuments(); 
-                    alert(`✅ Document ID ${docId} has been **RELEASED** by ${getCurrentUser()} and forwarded to: ${validOffice}.`);
+                    alert(`✅ Document ID ${docId} has been **RELEASED** by ${getCurrentUser()} (${getCurrentOffice()}) and forwarded to: ${validOffice}.`);
                 } else {
                     alert(`❌ Error: Invalid office name entered ("${newOffice}"). Please choose an existing office from the list.`);
                 }
@@ -512,13 +548,28 @@
     }
 
 
-    // --- Table Rendering (Unchanged) ---
+    // --- Table Rendering (UPDATED for Filtering) ---
 
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
         listBody.innerHTML = '';
         
-        documents.slice().reverse().forEach(doc => {
+        const currentOffice = getCurrentOffice();
+        
+        // FILTERING LOGIC
+        const filteredDocuments = documents.filter(doc => {
+            // If the user selects 'All Offices', show everything (Admin View)
+            if (currentOffice === 'All Offices') {
+                return true;
+            }
+            // Otherwise, only show documents currently destined for the user's office.
+            // Note: If the document is already "Released" and sent to a *different* office, it won't show up here,
+            // as its current destination (`forwarderOffice`) should reflect the next step.
+            return doc.forwarderOffice === currentOffice;
+        });
+
+        // Display the filtered documents (newest first)
+        filteredDocuments.slice().reverse().forEach(doc => {
             const row = listBody.insertRow();
             
             row.insertCell().textContent = doc.id;
@@ -530,7 +581,14 @@
             row.insertCell().textContent = doc.type;
             row.insertCell().textContent = doc.sourceOffice;
             row.insertCell().textContent = doc.dateReceived;
-            row.insertCell().textContent = doc.forwarderOffice; 
+            
+            // Highlight the current destination if it matches the logged-in office (Visual cue)
+            const destinationCell = row.insertCell();
+            destinationCell.textContent = doc.forwarderOffice; 
+            if (doc.forwarderOffice === currentOffice) {
+                destinationCell.style.backgroundColor = '#d4edda'; // Light green highlight
+            }
+
             row.insertCell().textContent = doc.dateReleased || 'Pending';
             
             const statusCell = row.insertCell();
@@ -543,14 +601,15 @@
             
             statusCell.style.color = statusColor;
             
-            row.insertCell().textContent = doc.loggedBy || 'N/A'; 
+            // Display both Name and Office in the "Logged By" column
+            row.insertCell().textContent = `${doc.loggedBy} (${doc.loggedOffice})`; 
 
             // Render barcode after the cell is added to the DOM
             setTimeout(() => renderBarcode(doc.id), 0);
         });
         
-        if (documents.length === 0) {
-            listBody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #777;">Start tracking your documents by clicking "Create NEW Unique Document ID" after filling the form.</td></tr>';
+        if (filteredDocuments.length === 0) {
+            listBody.innerHTML = `<tr style="color: #777;"><td colspan="9" style="text-align: center;">No documents currently received by the **${currentOffice}** office.</td></tr>`;
         }
     }
 
@@ -558,7 +617,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         loadDocuments();
         console.log(`[Document Tracker] Loaded ${documents.length} documents from Local Storage.`);
-        displayDocuments();
+        // Call checkLogin, which in turn calls showApp and displayDocuments with filtering
         checkLogin(); 
     });
 </script>
