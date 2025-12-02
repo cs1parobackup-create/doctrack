@@ -37,7 +37,6 @@
             width: 90%;
         }
         .login-box h2 { color: #007bff; margin-top: 0; }
-        /* Style for the new select input */
         .login-box select {
             width: 100%;
             padding: 12px;
@@ -83,8 +82,15 @@
         #documentTable th { background-color: #007bff; color: white; }
         #documentTable tr:nth-child(even) { background-color: #f2f2f2; }
 
+        /* Barcode Cell Styling */
         .barcode-cell { text-align: center; }
         .barcode-cell svg { max-width: 150px; height: 50px; } 
+        .barcode-cell .simple-id { 
+            display: block; 
+            font-weight: bold; 
+            font-size: 12px; 
+            margin-top: -5px; /* Pull text closer to the barcode */
+        }
         
         .persistence-controls { 
             display: flex; 
@@ -245,13 +251,12 @@
 
 <script>
     // --- Data Storage Keys ---
-    const COUNTER_KEY = 'docTrackerSequenceData'; // Key for daily sequence tracking
+    const COUNTER_KEY = 'docTrackerSequenceData';
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
 
     // --- Login/Session Functions ---
     function checkLogin() {
-        // Now checks for the logged-in office
         const loggedInOffice = sessionStorage.getItem('docTrackerUser');
         if (loggedInOffice) {
             document.getElementById('loggedInUserDisplay').textContent = loggedInOffice;
@@ -269,10 +274,9 @@
         document.getElementById('app-container').style.display = 'none';
     }
     function attemptLogin() {
-        // Gets value from the new SELECT dropdown
         const office = document.getElementById('officeSelect').value; 
         if (office) {
-            sessionStorage.setItem('docTrackerUser', office); // Stores the office name
+            sessionStorage.setItem('docTrackerUser', office); 
             document.getElementById('loggedInUserDisplay').textContent = office;
             showApp();
         } else {
@@ -286,11 +290,10 @@
         }
     }
     function getCurrentUser() {
-        // Returns the logged-in office name
         return sessionStorage.getItem('docTrackerUser') || 'UNKNOWN';
     }
 
-    // --- Persistence Functions (Unchanged) ---
+    // --- Persistence Functions ---
     function loadDocuments() {
         try {
             const storedDocs = localStorage.getItem(DOCUMENTS_KEY);
@@ -326,10 +329,9 @@
         }
     }
 
-    // --- Tracking ID Generation Logic (Unchanged from previous step) ---
+    // --- Tracking ID Generation Logic ---
 
     function getCurrentDateOnly() {
-        // Formats date as YYYY-MM-DD
         return new Date().toISOString().slice(0, 10);
     }
 
@@ -338,13 +340,11 @@
         let sequenceData = JSON.parse(localStorage.getItem(COUNTER_KEY));
         
         if (!sequenceData || sequenceData.date !== today) {
-            // Reset counter if storage is empty or date has changed
             sequenceData = { date: today, sequence: 0 };
         }
 
         sequenceData.sequence++;
         localStorage.setItem(COUNTER_KEY, JSON.stringify(sequenceData));
-        // Pad sequence to 5 digits (SSSSS)
         return String(sequenceData.sequence).padStart(5, '0');
     }
 
@@ -352,7 +352,6 @@
         const today = getCurrentDateOnly(); 
         const sequencePart = getSequence(); 
         
-        // HHMMSS time part for ultra-uniqueness
         const date = new Date();
         const hour = String(date.getHours()).padStart(2, '0');
         const minute = String(date.getMinutes()).padStart(2, '0');
@@ -363,18 +362,27 @@
         return `${today}-${sequencePart}-${timePart}`;
     }
     
-    // --- Barcode Functions (Unchanged) ---
+    // --- Barcode Functions (Updated) ---
 
     function generateBarcodeSVG(id) {
-        return `<svg id="barcode-${id}"></svg>`;
+        // Extract the 5-digit sequence part (SSSSS) for simple display
+        const parts = id.split('-');
+        let simpleId = 'N/A';
+        if (parts.length >= 3) {
+            simpleId = parts[2]; // This is the SSSSS part
+        }
+        
+        // Encode the FULL ID (for uniqueness) but display the simple ID (for simplicity)
+        return `<svg id="barcode-${id}"></svg><span class="simple-id">${simpleId}</span>`;
     }
 
     function renderBarcode(id) {
         if (document.getElementById(`barcode-${id}`)) {
             try {
+                // IMPORTANT: Encoding the FULL unique ID is crucial for correct lookup
                 JsBarcode(`#barcode-${id}`, id, {
                     format: "CODE128", 
-                    displayValue: false,
+                    displayValue: false, // Do NOT display the text inside the barcode image
                     width: 1.5, 
                     height: 50
                 });
@@ -427,13 +435,11 @@
         const docId = docIdInput.value.trim().toUpperCase();
         docIdInput.value = ''; 
 
-        // 1. NEW DOCUMENT ACTION
         if (actionType === 'NEW_DOC') {
             logNewDocument();
             return;
         }
 
-        // 2. RELEASE ACTION (Requires ID)
         if (!docId) {
             alert("Please enter the full Tracking ID to update or release the document.");
             return;
@@ -448,7 +454,6 @@
 
         const doc = documents[docIndex];
         
-        // Update/Release/Delete Prompt
         const action = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\nEnter 'RELEASE' to set the release date and specify a new office.\nEnter 'DELETE' to remove this document from the log.`);
 
         if (action && action.toUpperCase() === 'RELEASE') {
@@ -497,7 +502,7 @@
     }
 
 
-    // --- Table Rendering (Unchanged) ---
+    // --- Table Rendering ---
 
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
