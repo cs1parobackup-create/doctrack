@@ -149,7 +149,7 @@
             padding: 20px;
             border: 1px solid #888;
             width: 80%;
-            max-width: 700px; /* Increased modal width */
+            max-width: 700px; 
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
@@ -206,14 +206,7 @@
         
         <select id="officeSelect" required>
             <option value="" disabled selected>Select Office</option>
-            <option value="PARPO">PARPO</option>
-            <option value="STOD">STOD</option>
-            <option value="LEGAL">LEGAL</option>
-            <option value="LTSP">LTSP</option>
-            <option value="RECORDS">RECORDS</option>
-            <option value="ARBDSP">ARBDSP</option>
-            <option value="All Offices">All Offices (Admin View)</option>
-        </select>
+            </select>
         
         <button onclick="attemptLogin()">Log In</button>
         <p style="font-size: 10px; color: #dc3545; margin-top: 20px;">
@@ -268,11 +261,6 @@
                 <label for="sourceOffice">Source Office:</label>
                 <select id="sourceOffice" required>
                     <option value="" disabled selected>Select Source</option>
-                    <option value="Legal Division">Legal Division</option>
-                    <option value="Planning Section">Planning Section</option>
-                    <option value="Finance Unit">Finance Unit</option>
-                    <option value="Regional Office V">Regional Office V</option>
-                    <option value="Central Office">Central Office</option>
                 </select>
             </div>
 
@@ -285,11 +273,6 @@
                 <label for="forwarderOffice">Initial Office Destination (First Stop):</label> 
                 <select id="forwarderOffice" required>
                     <option value="" disabled selected>Select Destination</option>
-                    <option value="Legal Division">Legal Division</option>
-                    <option value="Planning Section">Planning Section</option>
-                    <option value="Finance Unit">Finance Unit</option>
-                    <option value="Regional Office V">Regional Office V</option>
-                    <option value="Records Section">Records Section</option>
                 </select>
             </div>
 
@@ -334,12 +317,66 @@
     // --- Configuration ---
     const ADMIN_PASSWORD = 'admin123'; // !!! CHANGE THIS PASSWORD !!!
     
+    // --- CENTRAL OFFICE LIST ---
+    const OFFICE_OPTIONS = [
+        "PARPO",
+        "STOD",
+        "LEGAL",
+        "LTSP",
+        "RECORDS",
+        "ARBDSP",
+        "Planning Section",
+        "Finance Unit",
+        "Regional Office V",
+        "Central Office",
+        // The following is the admin view option and is handled separately in logic
+        "All Offices" 
+    ];
+
     // --- Data Storage Keys ---
     const COUNTER_KEY = 'docTrackerSequenceAnnual';
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
 
-    // --- Modal Functions ---
+    // --- Dynamic Office Dropdown Population ---
+    function populateOfficeDropdowns() {
+        const officeSelect = document.getElementById('officeSelect');
+        const sourceOfficeSelect = document.getElementById('sourceOffice');
+        const forwarderOfficeSelect = document.getElementById('forwarderOffice');
+        
+        // Clear existing options (except the default placeholder)
+        officeSelect.innerHTML = '<option value="" disabled selected>Select Office</option>';
+        sourceOfficeSelect.innerHTML = '<option value="" disabled selected>Select Source</option>';
+        forwarderOfficeSelect.innerHTML = '<option value="" disabled selected>Select Destination</option>';
+        
+        // Filter out 'All Offices' for source/destination selectors as they are never a physical office entry
+        const functionalOffices = OFFICE_OPTIONS.filter(o => o !== "All Offices");
+
+        // 1. Populate Login/User Office Selector (Includes Admin)
+        OFFICE_OPTIONS.forEach(office => {
+            const option = document.createElement('option');
+            option.value = office;
+            option.textContent = office;
+            officeSelect.appendChild(option);
+        });
+
+        // 2. Populate Source/Destination Selectors (Functional Offices Only)
+        functionalOffices.forEach(office => {
+            // Clone option creation for Source Office
+            const sourceOption = document.createElement('option');
+            sourceOption.value = office;
+            sourceOption.textContent = office;
+            sourceOfficeSelect.appendChild(sourceOption);
+
+            // Clone option creation for Forwarder/Destination Office
+            const forwarderOption = document.createElement('option');
+            forwarderOption.value = office;
+            forwarderOption.textContent = office;
+            forwarderOfficeSelect.appendChild(forwarderOption);
+        });
+    }
+
+    // --- Modal Functions (Unchanged) ---
     function openModal(docId) {
         const doc = documents.find(d => d.id === docId);
         if (!doc) return;
@@ -372,7 +409,7 @@
     }
 
 
-    // --- Login/Session Functions (UPDATED FOR PASSWORD CHECK) ---
+    // --- Login/Session Functions ---
     function checkLogin() {
         const loggedInName = sessionStorage.getItem('docTrackerName');
         const loggedInOffice = sessionStorage.getItem('docTrackerOffice');
@@ -387,7 +424,7 @@
             document.getElementById('tableHeader').textContent = headerText;
             
             showApp();
-            displayDocuments(); // Redraws table after login
+            displayDocuments(); 
         } else {
             showLogin();
         }
@@ -477,7 +514,7 @@
         }
     }
 
-    // --- Tracking ID Generation Logic (Annual Reset) ---
+    // --- Tracking ID Generation Logic (Unchanged) ---
 
     function getCurrentYear() {
         return new Date().getFullYear().toString();
@@ -502,7 +539,7 @@
         return `${currentYear}-${sequencePart}`;
     }
     
-    // --- Barcode Functions ---
+    // --- Barcode Functions (Unchanged) ---
 
     function generateBarcodeSVG(id) {
         const parts = id.split('-');
@@ -531,10 +568,9 @@
         }
     }
 
-    // --- Document Logging ---
+    // --- Document Logging (Unchanged) ---
 
     function getCurrentDateTime() {
-        // Use the current time to log the action
         const now = new Date();
         const date = now.toISOString().slice(0, 10);
         const time = now.toTimeString().slice(0, 8);
@@ -581,7 +617,7 @@
         return true;
     }
 
-    // --- Action Logic ---
+    // --- Action Logic (UPDATED to use central list for prompt) ---
 
     function handleAction(actionType) {
         const docIdInput = document.getElementById('docId');
@@ -611,7 +647,7 @@
         const lastLog = doc.history[doc.history.length - 1];
         const currentDestination = lastLog.destinationOffice;
         
-        // SECURITY CHECK: Only the office currently holding the file can release it (unless admin)
+        // SECURITY CHECK
         if (currentUserOffice !== 'All Offices' && currentDestination !== currentUserOffice) {
             alert(`❌ ACCESS DENIED: This file is currently logged to be at ${currentDestination}. Only that office can perform the Release action.`);
             return;
@@ -621,15 +657,15 @@
 
         if (action && action.toUpperCase() === 'RELEASE') {
             
-            const officeSelect = document.getElementById('forwarderOffice');
-            const options = Array.from(officeSelect.options).filter(opt => opt.value !== '').map(opt => opt.value);
-            const officeList = options.join('\n- ');
+            // USE CENTRAL LIST, excluding admin view
+            const functionalOffices = OFFICE_OPTIONS.filter(o => o !== "All Offices");
+            const officeList = functionalOffices.join('\n- ');
             
             let newOffice = prompt(`***RELEASE ACTION: Select New Destination***\n\nEnter the **EXACT** name of the New Destination Office:\n\nAvailable Offices:\n- ${officeList}`);
 
             if (newOffice) {
                 newOffice = newOffice.trim();
-                const validOffice = options.find(o => o.toUpperCase() === newOffice.toUpperCase());
+                const validOffice = functionalOffices.find(o => o.toUpperCase() === newOffice.toUpperCase());
 
                 if (validOffice) {
                     // Log the movement (Release from current office to new office)
@@ -677,7 +713,7 @@
     }
 
 
-    // --- Table Rendering (Only displaying most recent log) ---
+    // --- Table Rendering (Unchanged) ---
 
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
@@ -777,6 +813,7 @@
 
     // --- Initialization: Load and Display Documents on page load ---
     document.addEventListener('DOMContentLoaded', () => {
+        populateOfficeDropdowns(); // Populate dropdowns first
         loadDocuments();
         console.log(`[Document Tracker] Loaded ${documents.length} documents from Local Storage.`);
         checkLogin(); 
