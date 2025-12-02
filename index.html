@@ -3,14 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Status Tracker (26-MM-XXXX Format) - With Login</title>
+    <title>Simplified Document Tracker (Manual Entry Only)</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
-
     <style>
         body { font-family: Arial, sans-serif; margin: 0; background-color: #f7f7f7; }
-        .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
         h1 { color: #007bff; text-align: center; margin-bottom: 5px; }
         
         /* Header for Username and Controls */
@@ -22,7 +19,7 @@
 
         /* Login Screen Styling */
         #login-container {
-            display: none; /* Controlled by JS */
+            display: none; 
             justify-content: center;
             align-items: center;
             height: 100vh;
@@ -58,25 +55,21 @@
         }
         .login-box button:hover { background-color: #218838; }
 
-        /* Rest of the Existing Styles */
+        /* Form Container (3 columns) */
         .form-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 30px; background-color: #e6f0ff; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { margin-bottom: 5px; font-weight: bold; color: #0056b3; }
         .form-container input, .form-container select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
         
-        /* Scanner Panel */
-        .scanner-panel { display: flex; flex-direction: column; gap: 20px; padding: 20px; border: 1px solid #ffc107; border-radius: 8px; margin-bottom: 30px; background-color: #fff8e1; }
-        .scanner-controls { display: flex; align-items: flex-end; gap: 15px; }
-        .scanner-controls .input-group { flex-grow: 1; }
-        .scanner-controls input { width: 100%; padding: 10px; border: 2px solid #ffc107; border-radius: 4px; font-size: 16px; font-weight: bold; }
-        
-        #reader { width: 100%; max-width: 400px; border: 1px solid #ccc; margin: 0 auto 10px; }
+        /* Action Panel */
+        .action-panel { display: flex; flex-direction: column; gap: 20px; padding: 20px; border: 1px solid #ffc107; border-radius: 8px; margin-bottom: 30px; background-color: #fff8e1; }
+        .action-controls { display: flex; align-items: flex-end; gap: 15px; }
+        .action-controls .input-group { flex-grow: 1; }
+        .action-controls input { width: 100%; padding: 10px; border: 2px solid #ffc107; border-radius: 4px; font-size: 16px; font-weight: bold; }
         
         .action-buttons button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-left: 10px; }
         .accept-btn { background-color: #28a745; color: white; }
         .release-btn { background-color: #dc3545; color: white; }
-        .start-btn { background-color: #007bff; color: white; }
-        .start-btn:hover { background-color: #0056b3; }
         .accept-btn:hover { background-color: #218838; }
         .release-btn:hover { background-color: #c82333; }
 
@@ -85,9 +78,7 @@
         #documentTable th, #documentTable td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
         #documentTable th { background-color: #007bff; color: white; }
         #documentTable tr:nth-child(even) { background-color: #f2f2f2; }
-        .barcode-cell { text-align: center; }
-        .barcode-cell svg { max-width: 150px; height: 50px; } 
-
+        
         .persistence-controls { 
             display: flex; 
             justify-content: flex-end; 
@@ -123,7 +114,7 @@
         <input type="text" id="usernameInput" placeholder="Enter your name or initials (e.g., JDELA CRUZ)">
         <button onclick="attemptLogin()">Log In</button>
         <p style="font-size: 10px; color: #dc3545; margin-top: 20px;">
-            ⚠️ This is for internal logging only. No password required.
+            ⚠️ This is for internal logging only.
         </p>
     </div>
 </div>
@@ -132,31 +123,25 @@
     <div class="container">
         
         <div class="app-header">
-            <h1 style="margin: 0;">Document Status Tracker 📄</h1>
+            <h1 style="margin: 0;">Simplified Document Tracker 📄</h1>
             <p>
                 Logged in as: <span id="loggedInUserDisplay">N/A</span> 
                 <button class="logout-btn" onclick="logout()">Log Out</button>
             </p>
         </div>
 
-        <div class="scanner-panel">
-            <h2>Barcode Scanner & Status Update</h2>
+        <div class="action-panel">
+            <h2>Document Action</h2>
 
-            <div id="reader"></div> 
-            <p id="scannerMessage" style="text-align: center; font-weight: bold; color: #555;">Scanner stopped. Click 'Start Scanner' to activate your camera and grant permission.</p>
-
-            <div class="scanner-controls">
-                <button id="startScanBtn" class="start-btn" onclick="startScanner()">Start Scanner</button>
-                <button id="stopScanBtn" class="release-btn" onclick="stopScanner()" style="display: none;">Stop Scanner</button>
-                
-                <div class="input-group" style="flex-grow: 1;">
-                    <label for="scannerId">Decoded Tracking ID / Manual Entry:</label>
-                    <input type="text" id="scannerId" placeholder="ID appears here (e.g., 26-12-0001)">
+            <div class="action-controls">
+                <div class="input-group">
+                    <label for="docId">Enter Tracking ID (or leave blank to create new ID):</label>
+                    <input type="text" id="docId" placeholder="ID appears here (e.g., 26-12-0001)">
                 </div>
                 
                 <div class="action-buttons">
-                    <button class="accept-btn" onclick="handleScanAction('ACCEPT')">Accept Document (Initial Log/Update)</button>
-                    <button class="release-btn" onclick="handleScanAction('RELEASE')">Release Document (Status Update)</button>
+                    <button class="accept-btn" onclick="handleAction('ACCEPT')">Accept Document (Initial Log/Update)</button>
+                    <button class="release-btn" onclick="handleAction('RELEASE')">Release Document (Status Update)</button>
                 </div>
             </div>
         </div>
@@ -219,7 +204,7 @@
         <h2>Document Log</h2>
         
         <div class="persistence-controls">
-            <button id="saveDataBtn" onclick="saveDocuments()">Manually Save Log 💾</button>
+            <button id="saveDataBtn" onclick="manualSaveDocuments()">Manually Save Log 💾</button>
             <button id="clearDataBtn" onclick="clearDocuments()">Clear All Log Data ⚠️</button>
         </div>
 
@@ -227,14 +212,14 @@
             <thead>
                 <tr>
                     <th>Tracking ID</th>
-                    <th>Barcode</th>
                     <th>Type</th>
                     <th>Source Office</th>
                     <th>Date Received</th>
                     <th>Last Destination / Current Office</th>
                     <th>Date Released</th>
                     <th>Status</th>
-                    <th>Logged By</th> </tr>
+                    <th>Logged By</th> 
+                </tr>
             </thead>
             <tbody id="documentList">
                 </tbody>
@@ -247,7 +232,6 @@
     const COUNTER_KEY = 'docTrackerSequence';
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
-    let html5QrCode = null; 
 
     // --- Login/Session Functions ---
     
@@ -290,11 +274,10 @@
     }
 
     function getCurrentUser() {
-        // Retrieve username for logging purposes
         return sessionStorage.getItem('docTrackerUser') || 'UNKNOWN';
     }
 
-    // --- Persistence Functions (Robust) ---
+    // --- Persistence Functions ---
 
     function loadDocuments() {
         try {
@@ -307,20 +290,17 @@
             }
         } catch (e) {
             console.error("Error loading documents from Local Storage:", e);
-            // Alert removed as it's not needed when running on a proper web server (GitHub Pages)
         }
     }
 
     function saveDocuments() {
         try {
             localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
-            // Alert removed from auto-save/update process for better user experience
         } catch (e) {
             console.error("Error saving documents to Local Storage:", e);
         }
     }
     
-    // Manual save function (retains alert)
     function manualSaveDocuments() {
          try {
             localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
@@ -335,7 +315,7 @@
         if (confirm("WARNING: This will permanently DELETE ALL logged documents and reset the tracking ID counter. Are you sure?")) {
             localStorage.removeItem(DOCUMENTS_KEY);
             localStorage.removeItem(COUNTER_KEY);
-            documents = []; // Clear in-memory array
+            documents = []; 
             displayDocuments();
             alert("All log data has been cleared.");
         }
@@ -360,30 +340,9 @@
     }
     
     function getCurrentDateOnly() {
-        // Formats date as YYYY-MM-DD
         return new Date().toISOString().slice(0, 10);
     }
 
-    function generateBarcodeSVG(id) {
-        return `<svg id="barcode-${id}"></svg>`;
-    }
-
-    function renderBarcode(id) {
-        if (document.getElementById(`barcode-${id}`)) {
-            try {
-                JsBarcode(`#barcode-${id}`, id, {
-                    format: "CODE128", 
-                    displayValue: false,
-                    width: 1,
-                    height: 50
-                });
-            } catch (e) {
-                console.error("Error rendering barcode:", e);
-            }
-        }
-    }
-
-    // Function to create and log a new document
     function logNewDocument(docId) {
         const type = document.getElementById('docType').value;
         const source = document.getElementById('sourceOffice').value;
@@ -416,148 +375,87 @@
         return true;
     }
 
-    // --- Action Logic (Accept/Release/Delete) ---
+    // --- Action Logic (Accept/Release) ---
 
-    function handleScanAction(actionType) {
-        const docIdInput = document.getElementById('scannerId');
+    function handleAction(actionType) {
+        const docIdInput = document.getElementById('docId');
         const docId = docIdInput.value.trim().toUpperCase();
         docIdInput.value = ''; 
 
-        if (html5QrCode && html5QrCode.isScanning) {
-            stopScanner();
-        }
-        
+        // 1. NEW ID GENERATION (ACCEPT action with empty ID field)
         if (!docId && actionType === 'ACCEPT') {
             const newSystemId = generateTrackingID();
             logNewDocument(newSystemId);
             return;
         }
 
+        // Check for ID if required for other actions
         if (!docId) {
-            alert("Please scan or enter a Tracking ID to perform this action.");
+            alert("Please enter a Tracking ID to perform this action, or leave blank and fill the form to create a NEW one.");
             return;
         }
         
         const docIndex = documents.findIndex(doc => doc.id === docId);
 
-        if (docIndex !== -1) {
-            const doc = documents[docIndex];
-            
-            const action = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\nEnter 'RELEASE' to set the release date and specify a new office.\nEnter 'DELETE' to remove this document from the log.`);
-
-            if (action && action.toUpperCase() === 'RELEASE') {
-                
-                if (doc.status === 'Released') {
-                    alert(`⚠️ Document ID ${docId} is ALREADY RELEASED. No action taken.`);
-                    return;
-                }
-                
-                const officeSelect = document.getElementById('forwarderOffice');
-                const options = Array.from(officeSelect.options).filter(opt => opt.value !== '').map(opt => opt.value);
-                const officeList = options.join('\n- ');
-                
-                let newOffice = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\n***RELEASE ACTION: Select New Destination***\n\nEnter the **EXACT** name of the New Destination Office:\n\nAvailable Offices:\n- ${officeList}`);
-
-                if (newOffice) {
-                    newOffice = newOffice.trim();
-                    const validOffice = options.find(o => o.toUpperCase() === newOffice.toUpperCase());
-
-                    if (validOffice) {
-                        doc.dateReleased = getCurrentDateOnly();
-                        doc.forwarderOffice = validOffice; 
-                        doc.status = 'Released';
-                        doc.loggedBy = getCurrentUser(); 
-                        saveDocuments(); 
-                        alert(`✅ Document ID ${docId} has been **RELEASED** by ${getCurrentUser()} and forwarded to: ${validOffice}.`);
-                    } else {
-                        alert(`❌ Error: Invalid office name entered ("${newOffice}"). Please choose an existing office from the list.`);
-                    }
-                } else {
-                    alert("Release action cancelled.");
-                }
-
-            } else if (action && action.toUpperCase() === 'DELETE') {
-                const confirmDelete = confirm(`Are you sure you want to DELETE Document ID ${docId}? This action cannot be undone. Logged by: ${getCurrentUser()}`);
-                if (confirmDelete) {
-                    documents.splice(docIndex, 1);
-                    saveDocuments(); 
-                    alert(`🗑️ Document ID ${docId} has been DELETED by ${getCurrentUser()}.`);
-                }
-            } else {
-                alert("Action cancelled or invalid option selected.");
-            }
-
-            displayDocuments();
-            return;
-        }
-
+        // 2. ID NOT FOUND
         if (docIndex === -1) {
             if (actionType === 'RELEASE') {
                 alert(`❌ Error: Document ID ${docId} not found. A document must be logged (Accepted) before it can be Released.`);
-                return;
-            }
-            
-            if (actionType === 'ACCEPT') {
+            } else if (actionType === 'ACCEPT') {
+                 // Log a new document using the manually entered ID
                 logNewDocument(docId);
             }
-        }
-    }
-
-
-    // --- Scanner Logic (Webcam) ---
-
-    function startScanner() {
-        if (html5QrCode && html5QrCode.isScanning) {
-            stopScanner();
             return;
         }
 
-        if (!html5QrCode) {
-            html5QrCode = new Html5Qrcode("reader");
-        }
+        const doc = documents[docIndex];
         
-        document.getElementById('scannerId').value = '';
-        document.getElementById('scannerMessage').textContent = 'Starting camera... Please check your browser for permission request.';
-        
-        const config = {
-            fps: 10,
-            qrbox: { width: 250, height: 100 },
-            supportedScanFormats: [Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] 
-        };
+        // 3. ID FOUND (Update/Release/Delete Prompt)
+        const action = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\nEnter 'RELEASE' to set the release date and specify a new office.\nEnter 'DELETE' to remove this document from the log.`);
 
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            config,
-            (decodedText, decodedResult) => {
-                document.getElementById('scannerId').value = decodedText.toUpperCase();
-                stopScanner();
-                document.getElementById('scannerMessage').textContent = `✅ Scanned ID: ${decodedText.toUpperCase()}. Click Accept or Release.`;
-            },
-            (errorMessage) => {})
-        .catch((err) => {
-            document.getElementById('scannerMessage').textContent = `❌ ERROR: Failed to start scanner. Check camera permission in your browser's address bar.`;
-            console.error("Scanner startup error:", err);
-            stopScanner();
-        });
+        if (action && action.toUpperCase() === 'RELEASE') {
+            
+            if (doc.status === 'Released') {
+                alert(`⚠️ Document ID ${docId} is ALREADY RELEASED. No action taken.`);
+                return;
+            }
+            
+            const officeSelect = document.getElementById('forwarderOffice');
+            const options = Array.from(officeSelect.options).filter(opt => opt.value !== '').map(opt => opt.value);
+            const officeList = options.join('\n- ');
+            
+            let newOffice = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\n***RELEASE ACTION: Select New Destination***\n\nEnter the **EXACT** name of the New Destination Office:\n\nAvailable Offices:\n- ${officeList}`);
 
-        document.getElementById('startScanBtn').style.display = 'none';
-        document.getElementById('stopScanBtn').style.display = 'inline-block';
-    }
+            if (newOffice) {
+                newOffice = newOffice.trim();
+                const validOffice = options.find(o => o.toUpperCase() === newOffice.toUpperCase());
 
-    function stopScanner() {
-        if (html5QrCode && html5QrCode.isScanning) {
-            html5QrCode.stop().then(() => {
-                document.getElementById('scannerMessage').textContent = 'Scanner stopped.';
-                document.getElementById('startScanBtn').style.display = 'inline-block';
-                document.getElementById('stopScanBtn').style.display = 'none';
-            }).catch(err => {
-                document.getElementById('scannerMessage').textContent = 'Scanner stopped (with error).';
-            });
+                if (validOffice) {
+                    doc.dateReleased = getCurrentDateOnly();
+                    doc.forwarderOffice = validOffice; 
+                    doc.status = 'Released';
+                    doc.loggedBy = getCurrentUser(); 
+                    saveDocuments(); 
+                    alert(`✅ Document ID ${docId} has been **RELEASED** by ${getCurrentUser()} and forwarded to: ${validOffice}.`);
+                } else {
+                    alert(`❌ Error: Invalid office name entered ("${newOffice}"). Please choose an existing office from the list.`);
+                }
+            } else {
+                alert("Release action cancelled.");
+            }
+
+        } else if (action && action.toUpperCase() === 'DELETE') {
+            const confirmDelete = confirm(`Are you sure you want to DELETE Document ID ${docId}? This action cannot be undone. Logged by: ${getCurrentUser()}`);
+            if (confirmDelete) {
+                documents.splice(docIndex, 1);
+                saveDocuments(); 
+                alert(`🗑️ Document ID ${docId} has been DELETED by ${getCurrentUser()}.`);
+            }
         } else {
-             document.getElementById('scannerMessage').textContent = 'Scanner stopped.';
-             document.getElementById('startScanBtn').style.display = 'inline-block';
-             document.getElementById('stopScanBtn').style.display = 'none';
+            alert("Action cancelled or invalid option selected.");
         }
+
+        displayDocuments();
     }
 
 
@@ -571,11 +469,6 @@
             const row = listBody.insertRow();
             
             row.insertCell().textContent = doc.id;
-            
-            const barcodeCell = row.insertCell();
-            barcodeCell.className = 'barcode-cell';
-            barcodeCell.innerHTML = generateBarcodeSVG(doc.id);
-
             row.insertCell().textContent = doc.type;
             row.insertCell().textContent = doc.sourceOffice;
             row.insertCell().textContent = doc.dateReceived;
@@ -592,14 +485,11 @@
             
             statusCell.style.color = statusColor;
             
-            row.insertCell().textContent = doc.loggedBy || 'N/A'; // Display Logged By
-
-            // Render barcode after the cell is added to the DOM
-            setTimeout(() => renderBarcode(doc.id), 0);
+            row.insertCell().textContent = doc.loggedBy || 'N/A'; 
         });
         
         if (documents.length === 0) {
-            listBody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #777;">Start tracking your documents by clicking "Accept Document" after filling the form.</td></tr>';
+            listBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #777;">Start tracking your documents by clicking "Accept Document" after filling the form.</td></tr>';
         }
     }
 
@@ -608,7 +498,7 @@
         loadDocuments();
         console.log(`[Document Tracker] Loaded ${documents.length} documents from Local Storage.`);
         displayDocuments();
-        checkLogin(); // Check for existing user session
+        checkLogin(); 
     });
 </script>
 
