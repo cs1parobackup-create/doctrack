@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simplified Document Tracker (Manual Entry Only)</title>
+    <title>Automated Tracker (YYYY-MM-DD-SSSSS-HHMMSS)</title>
     
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+
     <style>
         body { font-family: Arial, sans-serif; margin: 0; background-color: #f7f7f7; }
-        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
         h1 { color: #007bff; text-align: center; margin-bottom: 5px; }
         
         /* Header for Username and Controls */
@@ -17,7 +19,7 @@
         .logout-btn { background-color: #6c757d; color: white; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .logout-btn:hover { background-color: #5a6268; }
 
-        /* Login Screen Styling */
+        /* Login Screen Styling (Retained) */
         #login-container {
             display: none; 
             justify-content: center;
@@ -78,6 +80,9 @@
         #documentTable th, #documentTable td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
         #documentTable th { background-color: #007bff; color: white; }
         #documentTable tr:nth-child(even) { background-color: #f2f2f2; }
+
+        .barcode-cell { text-align: center; }
+        .barcode-cell svg { max-width: 150px; height: 50px; } 
         
         .persistence-controls { 
             display: flex; 
@@ -123,7 +128,7 @@
     <div class="container">
         
         <div class="app-header">
-            <h1 style="margin: 0;">Simplified Document Tracker 📄</h1>
+            <h1 style="margin: 0;">Automated Document Tracker 📄</h1>
             <p>
                 Logged in as: <span id="loggedInUserDisplay">N/A</span> 
                 <button class="logout-btn" onclick="logout()">Log Out</button>
@@ -131,23 +136,23 @@
         </div>
 
         <div class="action-panel">
-            <h2>Document Action</h2>
+            <h2>Document Action: Auto-Generation and Status Update</h2>
 
             <div class="action-controls">
                 <div class="input-group">
-                    <label for="docId">Enter Tracking ID (or leave blank to create new ID):</label>
-                    <input type="text" id="docId" placeholder="ID appears here (e.g., 26-12-0001)">
+                    <label for="docId">Enter Full Tracking ID to Update/Release:</label>
+                    <input type="text" id="docId" placeholder="e.g., YYYY-MM-DD-SSSSS-HHMMSS">
                 </div>
                 
                 <div class="action-buttons">
-                    <button class="accept-btn" onclick="handleAction('ACCEPT')">Accept Document (Initial Log/Update)</button>
+                    <button class="accept-btn" onclick="handleAction('NEW_DOC')">Create NEW Unique Document ID</button>
                     <button class="release-btn" onclick="handleAction('RELEASE')">Release Document (Status Update)</button>
                 </div>
             </div>
         </div>
 
         <div id="documentForm" class="form-container">
-            <h2>New Document Details (Required for Initial Log)</h2>
+            <h2>New Document Details (Required for **NEW** Log Action)</h2>
             <div class="form-group">
                 <label for="docType">Document Type:</label>
                 <select id="docType" required>
@@ -191,7 +196,7 @@
             </div>
 
             <div class="form-group">
-                <label>Date Received (Auto-filled on 'Accept'):</label>
+                <label>Date Received (Auto-filled):</label>
                 <input type="text" disabled placeholder="Will be set upon Acceptance">
             </div>
             
@@ -212,6 +217,7 @@
             <thead>
                 <tr>
                     <th>Tracking ID</th>
+                    <th>Barcode</th>
                     <th>Type</th>
                     <th>Source Office</th>
                     <th>Date Received</th>
@@ -229,12 +235,11 @@
 
 <script>
     // --- Data Storage Keys ---
-    const COUNTER_KEY = 'docTrackerSequence';
+    const COUNTER_KEY = 'docTrackerSequenceData'; // Key for daily sequence tracking
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
 
-    // --- Login/Session Functions ---
-    
+    // --- Login/Session Functions (Unchanged) ---
     function checkLogin() {
         const loggedInUser = sessionStorage.getItem('docTrackerUser');
         if (loggedInUser) {
@@ -244,17 +249,14 @@
             showLogin();
         }
     }
-
     function showApp() {
         document.getElementById('login-container').style.display = 'none';
         document.getElementById('app-container').style.display = 'block';
     }
-
     function showLogin() {
         document.getElementById('login-container').style.display = 'flex';
         document.getElementById('app-container').style.display = 'none';
     }
-
     function attemptLogin() {
         const username = document.getElementById('usernameInput').value.trim().toUpperCase();
         if (username) {
@@ -265,20 +267,17 @@
             alert("Please enter a username.");
         }
     }
-
     function logout() {
         if (confirm("Are you sure you want to log out?")) {
             sessionStorage.removeItem('docTrackerUser');
             showLogin();
         }
     }
-
     function getCurrentUser() {
         return sessionStorage.getItem('docTrackerUser') || 'UNKNOWN';
     }
 
-    // --- Persistence Functions ---
-
+    // --- Persistence Functions (Unchanged) ---
     function loadDocuments() {
         try {
             const storedDocs = localStorage.getItem(DOCUMENTS_KEY);
@@ -288,19 +287,13 @@
                     documents = parsedDocs;
                 }
             }
-        } catch (e) {
-            console.error("Error loading documents from Local Storage:", e);
-        }
+        } catch (e) { console.error("Error loading documents from Local Storage:", e); }
     }
-
     function saveDocuments() {
         try {
             localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
-        } catch (e) {
-            console.error("Error saving documents to Local Storage:", e);
-        }
+        } catch (e) { console.error("Error saving documents to Local Storage:", e); }
     }
-    
     function manualSaveDocuments() {
          try {
             localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
@@ -310,7 +303,6 @@
             alert("Error: Could not save log data to Local Storage.");
         }
     }
-
     function clearDocuments() {
         if (confirm("WARNING: This will permanently DELETE ALL logged documents and reset the tracking ID counter. Are you sure?")) {
             localStorage.removeItem(DOCUMENTS_KEY);
@@ -321,38 +313,79 @@
         }
     }
 
+    // --- Tracking ID Generation Logic (New) ---
 
-    // --- Helper Functions ---
-
-    function generateTrackingID() {
-        const today = new Date();
-        const FIXED_YEAR = '26';
-        
-        const monthPart = String(today.getMonth() + 1).padStart(2, '0');
-        
-        let sequence = parseInt(localStorage.getItem(COUNTER_KEY)) || 0;
-        sequence++;
-        localStorage.setItem(COUNTER_KEY, sequence);
-
-        const seqPart = String(sequence).padStart(4, '0');
-        
-        return `${FIXED_YEAR}-${monthPart}-${seqPart}`;
-    }
-    
     function getCurrentDateOnly() {
+        // Formats date as YYYY-MM-DD
         return new Date().toISOString().slice(0, 10);
     }
 
-    function logNewDocument(docId) {
+    function getSequence() {
+        const today = getCurrentDateOnly(); 
+        let sequenceData = JSON.parse(localStorage.getItem(COUNTER_KEY));
+        
+        if (!sequenceData || sequenceData.date !== today) {
+            // Reset counter if storage is empty or date has changed
+            sequenceData = { date: today, sequence: 0 };
+        }
+
+        sequenceData.sequence++;
+        localStorage.setItem(COUNTER_KEY, JSON.stringify(sequenceData));
+        // Pad sequence to 5 digits (SSSSS)
+        return String(sequenceData.sequence).padStart(5, '0');
+    }
+
+    function generateTrackingID() {
+        const today = getCurrentDateOnly(); 
+        const sequencePart = getSequence(); 
+        
+        // HHMMSS time part for ultra-uniqueness
+        const date = new Date();
+        const hour = String(date.getHours()).padStart(2, '0');
+        const minute = String(date.getMinutes()).padStart(2, '0');
+        const second = String(date.getSeconds()).padStart(2, '0');
+        const timePart = `${hour}${minute}${second}`;
+
+        // Format: YYYY-MM-DD-SSSSS-HHMMSS
+        return `${today}-${sequencePart}-${timePart}`;
+    }
+    
+    // --- Barcode Functions (Re-introduced) ---
+
+    function generateBarcodeSVG(id) {
+        return `<svg id="barcode-${id}"></svg>`;
+    }
+
+    function renderBarcode(id) {
+        if (document.getElementById(`barcode-${id}`)) {
+            try {
+                JsBarcode(`#barcode-${id}`, id, {
+                    format: "CODE128", 
+                    displayValue: false,
+                    width: 1.5, // slightly wider for complex ID
+                    height: 50
+                });
+            } catch (e) {
+                console.error("Error rendering barcode:", e);
+            }
+        }
+    }
+
+    // --- Document Logging ---
+
+    function logNewDocument() {
         const type = document.getElementById('docType').value;
         const source = document.getElementById('sourceOffice').value;
         const forwarder = document.getElementById('forwarderOffice').value;
         const details = document.getElementById('docDetails').value.trim();
 
         if (!type || !source || !forwarder || !details) {
-            alert(`To log a NEW document with ID "${docId}", please fill out all required fields in the form below.`);
+            alert(`To create a NEW document ID, you must fill out all required fields in the form below.`);
             return false;
         }
+        
+        // *** AUTOMATICALLY GENERATE UNIQUE ID ***
+        const docId = generateTrackingID();
 
         const newDoc = {
             id: docId, 
@@ -371,46 +404,39 @@
         saveDocuments(); 
         displayDocuments();
 
-        alert(`✅ NEW Document successfully logged by ${getCurrentUser()}! Tracking ID: ${docId}`);
+        alert(`✅ NEW Document successfully logged by ${getCurrentUser()}! Generated Tracking ID: ${docId}`);
         return true;
     }
 
-    // --- Action Logic (Accept/Release) ---
+    // --- Action Logic (New Document / Release) ---
 
     function handleAction(actionType) {
         const docIdInput = document.getElementById('docId');
         const docId = docIdInput.value.trim().toUpperCase();
         docIdInput.value = ''; 
 
-        // 1. NEW ID GENERATION (ACCEPT action with empty ID field)
-        if (!docId && actionType === 'ACCEPT') {
-            const newSystemId = generateTrackingID();
-            logNewDocument(newSystemId);
+        // 1. NEW DOCUMENT ACTION
+        if (actionType === 'NEW_DOC') {
+            logNewDocument();
             return;
         }
 
-        // Check for ID if required for other actions
+        // 2. RELEASE ACTION (Requires ID)
         if (!docId) {
-            alert("Please enter a Tracking ID to perform this action, or leave blank and fill the form to create a NEW one.");
+            alert("Please enter the full Tracking ID to update or release the document.");
             return;
         }
         
         const docIndex = documents.findIndex(doc => doc.id === docId);
 
-        // 2. ID NOT FOUND
         if (docIndex === -1) {
-            if (actionType === 'RELEASE') {
-                alert(`❌ Error: Document ID ${docId} not found. A document must be logged (Accepted) before it can be Released.`);
-            } else if (actionType === 'ACCEPT') {
-                 // Log a new document using the manually entered ID
-                logNewDocument(docId);
-            }
+            alert(`❌ Error: Document ID ${docId} not found. Please verify the ID is correct.`);
             return;
         }
 
         const doc = documents[docIndex];
         
-        // 3. ID FOUND (Update/Release/Delete Prompt)
+        // Update/Release/Delete Prompt
         const action = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\nEnter 'RELEASE' to set the release date and specify a new office.\nEnter 'DELETE' to remove this document from the log.`);
 
         if (action && action.toUpperCase() === 'RELEASE') {
@@ -469,6 +495,11 @@
             const row = listBody.insertRow();
             
             row.insertCell().textContent = doc.id;
+            
+            const barcodeCell = row.insertCell();
+            barcodeCell.className = 'barcode-cell';
+            barcodeCell.innerHTML = generateBarcodeSVG(doc.id);
+
             row.insertCell().textContent = doc.type;
             row.insertCell().textContent = doc.sourceOffice;
             row.insertCell().textContent = doc.dateReceived;
@@ -486,10 +517,13 @@
             statusCell.style.color = statusColor;
             
             row.insertCell().textContent = doc.loggedBy || 'N/A'; 
+
+            // Render barcode after the cell is added to the DOM
+            setTimeout(() => renderBarcode(doc.id), 0);
         });
         
         if (documents.length === 0) {
-            listBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #777;">Start tracking your documents by clicking "Accept Document" after filling the form.</td></tr>';
+            listBody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #777;">Start tracking your documents by clicking "Create NEW Unique Document ID" after filling the form.</td></tr>';
         }
     }
 
