@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated Tracker (YYYY-SSSSS) - Continuous Log</title>
+    <title>Automated Tracker (YYYY-SSSSS) - Password Protected Admin</title>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
@@ -217,7 +217,7 @@
         
         <button onclick="attemptLogin()">Log In</button>
         <p style="font-size: 10px; color: #dc3545; margin-top: 20px;">
-            ⚠️ This is for internal logging only.
+            ⚠️ If selecting **All Offices**, you will be prompted for the administrator password.
         </p>
     </div>
 </div>
@@ -331,6 +331,9 @@
 </div>
 
 <script>
+    // --- Configuration ---
+    const ADMIN_PASSWORD = 'admin123'; // !!! CHANGE THIS PASSWORD !!!
+    
     // --- Data Storage Keys ---
     const COUNTER_KEY = 'docTrackerSequenceAnnual';
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
@@ -369,7 +372,7 @@
     }
 
 
-    // --- Login/Session Functions ---
+    // --- Login/Session Functions (UPDATED FOR PASSWORD CHECK) ---
     function checkLogin() {
         const loggedInName = sessionStorage.getItem('docTrackerName');
         const loggedInOffice = sessionStorage.getItem('docTrackerOffice');
@@ -379,7 +382,7 @@
             document.getElementById('loggedInOfficeDisplay').textContent = loggedInOffice;
             
             const headerText = (loggedInOffice === 'All Offices') 
-                ? "Document Log (Showing ALL Files - Admin View)" 
+                ? "Document Log (Showing ALL Files - ADMIN VIEW)" 
                 : `Document Log (Showing Files for ${loggedInOffice})`;
             document.getElementById('tableHeader').textContent = headerText;
             
@@ -404,13 +407,22 @@
         const name = document.getElementById('nameInput').value.trim();
         const office = document.getElementById('officeSelect').value; 
 
-        if (name && office) {
-            sessionStorage.setItem('docTrackerName', name); 
-            sessionStorage.setItem('docTrackerOffice', office); 
-            checkLogin();
-        } else {
+        if (!name || !office) {
             alert("Please enter your name and select your office.");
+            return;
         }
+
+        if (office === 'All Offices') {
+            const password = prompt("ADMIN VIEW SELECTED: Please enter the administrator password:");
+            if (password !== ADMIN_PASSWORD) {
+                alert("Incorrect password. Access denied.");
+                return;
+            }
+        }
+        
+        sessionStorage.setItem('docTrackerName', name); 
+        sessionStorage.setItem('docTrackerOffice', office); 
+        checkLogin();
     }
     
     function logout() {
@@ -519,9 +531,10 @@
         }
     }
 
-    // --- Document Logging (UPDATED to include deadline) ---
+    // --- Document Logging ---
 
     function getCurrentDateTime() {
+        // Use the current time to log the action
         const now = new Date();
         const date = now.toISOString().slice(0, 10);
         const time = now.toTimeString().slice(0, 8);
@@ -533,7 +546,7 @@
         const source = document.getElementById('sourceOffice').value;
         const initialDestination = document.getElementById('forwarderOffice').value;
         const details = document.getElementById('docDetails').value.trim();
-        const deadline = document.getElementById('deadlineDate').value; // NEW
+        const deadline = document.getElementById('deadlineDate').value; 
 
         if (!type || !source || !initialDestination || !details || !deadline) {
             alert(`To create a NEW document ID, you must fill out ALL required fields in the form below, including the Deadline.`);
@@ -549,8 +562,7 @@
             type: type,
             sourceOffice: source,
             docDetails: details,
-            deadline: deadline, // NEW FIELD
-            // History array stores all movement/status changes
+            deadline: deadline, 
             history: [{
                 timestamp: getCurrentDateTime(),
                 action: 'Received (Initial Log)',
@@ -569,7 +581,7 @@
         return true;
     }
 
-    // --- Action Logic (Unchanged in core logic) ---
+    // --- Action Logic ---
 
     function handleAction(actionType) {
         const docIdInput = document.getElementById('docId');
@@ -596,7 +608,6 @@
         const doc = documents[docIndex];
         const currentUserOffice = getCurrentOffice();
         
-        // Find the current destination/status
         const lastLog = doc.history[doc.history.length - 1];
         const currentDestination = lastLog.destinationOffice;
         
@@ -666,7 +677,7 @@
     }
 
 
-    // --- Table Rendering (UPDATED for Filtering and new columns) ---
+    // --- Table Rendering (Only displaying most recent log) ---
 
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
