@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated Tracker (YYYY-SSSSS) - Password Protected Admin</title>
+    <title>Automated Tracker (YYYY-SSSSS) - Cloud Log</title>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
@@ -175,9 +175,28 @@
             font-weight: bold;
             color: #dc3545;
         }
+        /* Loading indicator styling */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            font-size: 1.5em;
+            color: #007bff;
+        }
     </style>
 </head>
 <body>
+
+<div id="loadingOverlay" class="loading-overlay" style="display:none;">
+    Loading/Saving Data... Please wait.
+</div>
 
 <div id="historyModal" class="modal">
     <div class="modal-content">
@@ -290,8 +309,8 @@
         <h2 id="tableHeader">Document Log (Showing Files for Your Office)</h2>
         
         <div class="persistence-controls">
-            <button id="saveDataBtn" onclick="manualSaveDocuments()">Manually Save Log 💾</button>
-            <button id="clearDataBtn" onclick="clearDocuments()">Clear All Log Data ⚠️</button>
+            <button id="saveDataBtn" onclick="saveDocuments(true)">Save Log Now 💾</button>
+            <button id="clearDataBtn" onclick="clearDocuments()">Clear ALL Log Data ⚠️</button>
         </div>
 
         <table id="documentTable">
@@ -314,10 +333,15 @@
 </div>
 
 <script>
-    // --- Configuration ---
+    // --------------------------------------------------------------------------------
+    // --- IMPORTANT CONFIGURATION ---
+    // --------------------------------------------------------------------------------
     const ADMIN_PASSWORD = 'admin123'; // !!! CHANGE THIS PASSWORD !!!
     
-    // --- CENTRAL OFFICE LIST ---
+    // !!! YOU MUST REPLACE THIS PLACEHOLDER URL !!!
+    // This is the URL of the Google Apps Script Web App you will deploy in the next step.
+    const API_ENDPOINT = 'YOUR_WEB_APP_URL';
+    
     const OFFICE_OPTIONS = [
         "PARPO",
         "STOD",
@@ -329,27 +353,128 @@
         "Finance Unit",
         "Regional Office V",
         "Central Office",
-        // The following is the admin view option and is handled separately in logic
+        // The following is the admin view option
         "All Offices" 
     ];
 
-    // --- Data Storage Keys ---
-    const COUNTER_KEY = 'docTrackerSequenceAnnual';
-    const DOCUMENTS_KEY = 'docTrackerDocuments'; 
+    // --- Global State Variables ---
     let documents = []; 
+    let currentSequence = 0;
+    let currentYear = new Date().getFullYear().toString();
+    
+    // --- Utility Functions ---
+    
+    function showLoading() {
+        document.getElementById('loadingOverlay').style.display = 'flex';
+    }
 
-    // --- Dynamic Office Dropdown Population ---
+    function hideLoading() {
+        document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+
+    // --------------------------------------------------------------------------------
+    // --- PERSISTENCE FUNCTIONS (Cloud Integration) ---
+    // --------------------------------------------------------------------------------
+    
+    // 1. LOAD DATA (GET request to GAS)
+    async function loadDocuments() {
+        showLoading();
+        try {
+            if (API_ENDPOINT === 'YOUR_WEB_APP_URL') {
+                alert("ERROR: API_ENDPOINT is not set. Data cannot be loaded from the cloud. Please follow the Google Apps Script instructions.");
+                documents = [];
+                currentSequence = 0;
+                hideLoading();
+                return;
+            }
+
+            const response = await fetch(API_ENDPOINT, { method: 'GET' });
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const data = await response.json();
+
+            // Store documents and sequence globally
+            documents = data.documents || [];
+            currentSequence = data.sequence || 0;
+            currentYear = data.year || new Date().getFullYear().toString();
+            
+            console.log(`[Cloud Tracker] Loaded ${documents.length} documents.`);
+
+        } catch (e) { 
+            console.error("Error loading documents from the cloud:", e); 
+            alert(`Error loading data: ${e.message}. Using empty log.`);
+            documents = [];
+            currentSequence = 0;
+        } finally {
+            hideLoading();
+        }
+    }
+
+    // 2. SAVE DATA (POST request to GAS)
+    // The `manual` flag determines if we show a success message
+    async function saveDocuments(manual = false) {
+        showLoading();
+        const dataToSend = {
+            documents: documents,
+            sequence: currentSequence,
+            year: currentYear
+        };
+
+        try {
+            if (API_ENDPOINT === 'YOUR_WEB_APP_URL') {
+                 throw new Error("API_ENDPOINT is not set. Data cannot be saved.");
+            }
+            
+            const response = await fetch(API_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dataToSend)
+            });
+
+            if (!response.ok) throw new Error(`Server returned status: ${response.status}`);
+            
+            const result = await response.json();
+            if (result.status !== 'success') throw new Error(`GAS Script Error: ${result.message}`);
+
+            if (manual) {
+                alert("✅ Log data successfully saved to Google Sheet!");
+            }
+
+        } catch (e) { 
+            console.error("Error saving documents to the cloud:", e); 
+            alert(`❌ Critical Save Error: ${e.message}. Check your API URL and Google Apps Script deployment.`);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    // 3. CLEAR DATA 
+    async function clearDocuments() {
+        if (confirm("WARNING: This will permanently DELETE ALL logged documents and reset the tracking ID counter on the CLOUD. Are you absolutely sure?")) {
+            documents = []; 
+            currentSequence = 0;
+            await saveDocuments(false); 
+            displayDocuments();
+            alert("All cloud log data has been cleared.");
+        }
+    }
+
+
+    // --- Other Functions (Mostly Unchanged, but now rely on save/load) ---
+
+    // Dynamic Office Dropdown Population
     function populateOfficeDropdowns() {
         const officeSelect = document.getElementById('officeSelect');
         const sourceOfficeSelect = document.getElementById('sourceOffice');
         const forwarderOfficeSelect = document.getElementById('forwarderOffice');
         
-        // Clear existing options (except the default placeholder)
         officeSelect.innerHTML = '<option value="" disabled selected>Select Office</option>';
         sourceOfficeSelect.innerHTML = '<option value="" disabled selected>Select Source</option>';
         forwarderOfficeSelect.innerHTML = '<option value="" disabled selected>Select Destination</option>';
         
-        // Filter out 'All Offices' for source/destination selectors as they are never a physical office entry
         const functionalOffices = OFFICE_OPTIONS.filter(o => o !== "All Offices");
 
         // 1. Populate Login/User Office Selector (Includes Admin)
@@ -362,13 +487,11 @@
 
         // 2. Populate Source/Destination Selectors (Functional Offices Only)
         functionalOffices.forEach(office => {
-            // Clone option creation for Source Office
             const sourceOption = document.createElement('option');
             sourceOption.value = office;
             sourceOption.textContent = office;
             sourceOfficeSelect.appendChild(sourceOption);
 
-            // Clone option creation for Forwarder/Destination Office
             const forwarderOption = document.createElement('option');
             forwarderOption.value = office;
             forwarderOption.textContent = office;
@@ -376,7 +499,7 @@
         });
     }
 
-    // --- Modal Functions (Unchanged) ---
+    // Modal Functions
     function openModal(docId) {
         const doc = documents.find(d => d.id === docId);
         if (!doc) return;
@@ -400,7 +523,6 @@
         document.getElementById('historyModal').style.display = 'none';
     }
 
-    // Close modal when clicking outside of it
     window.onclick = function(event) {
         const modal = document.getElementById('historyModal');
         if (event.target == modal) {
@@ -409,7 +531,7 @@
     }
 
 
-    // --- Login/Session Functions ---
+    // Login/Session Functions (Uses Session Storage for user session, but data is cloud-based)
     function checkLogin() {
         const loggedInName = sessionStorage.getItem('docTrackerName');
         const loggedInOffice = sessionStorage.getItem('docTrackerOffice');
@@ -478,78 +600,35 @@
         return sessionStorage.getItem('docTrackerOffice') || 'UNKNOWN';
     }
 
-    // --- Persistence Functions (Unchanged) ---
-    function loadDocuments() {
-        try {
-            const storedDocs = localStorage.getItem(DOCUMENTS_KEY);
-            if (storedDocs) {
-                const parsedDocs = JSON.parse(storedDocs);
-                if (Array.isArray(parsedDocs)) {
-                    documents = parsedDocs;
-                }
-            }
-        } catch (e) { console.error("Error loading documents from Local Storage:", e); }
-    }
-    function saveDocuments() {
-        try {
-            localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
-        } catch (e) { console.error("Error saving documents to Local Storage:", e); }
-    }
-    function manualSaveDocuments() {
-         try {
-            localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
-            alert("Log data successfully saved to browser's local storage.");
-        } catch (e) {
-            console.error("Error saving documents to Local Storage:", e);
-            alert("Error: Could not save log data to Local Storage.");
-        }
-    }
-    function clearDocuments() {
-        if (confirm("WARNING: This will permanently DELETE ALL logged documents and reset the tracking ID counter. Are you sure?")) {
-            localStorage.removeItem(DOCUMENTS_KEY);
-            localStorage.removeItem(COUNTER_KEY);
-            documents = []; 
-            displayDocuments();
-            alert("All log data has been cleared.");
-        }
-    }
 
-    // --- Tracking ID Generation Logic (Unchanged) ---
-
-    function getCurrentYear() {
-        return new Date().getFullYear().toString();
-    }
+    // Tracking ID Generation Logic (Uses global variables managed by cloud)
 
     function getSequence() {
-        const currentYear = getCurrentYear(); 
-        let sequenceData = JSON.parse(localStorage.getItem(COUNTER_KEY));
+        const newYear = new Date().getFullYear().toString();
         
-        if (!sequenceData || sequenceData.year !== currentYear) {
-            sequenceData = { year: currentYear, sequence: 0 };
+        // Check for year change (resets sequence)
+        if (currentYear !== newYear) {
+            currentYear = newYear;
+            currentSequence = 0;
         }
 
-        sequenceData.sequence++;
-        localStorage.setItem(COUNTER_KEY, JSON.stringify(sequenceData));
-        return String(sequenceData.sequence).padStart(5, '0');
+        currentSequence++;
+        return String(currentSequence).padStart(5, '0');
     }
 
     function generateTrackingID() {
-        const currentYear = getCurrentYear();
         const sequencePart = getSequence();
         return `${currentYear}-${sequencePart}`;
     }
     
-    // --- Barcode Functions (Unchanged) ---
-
+    // Barcode Functions (Unchanged)
     function generateBarcodeSVG(id) {
         const parts = id.split('-');
         let simpleId = 'N/A';
-        
         if (parts.length === 2) {
             const sequence5Digit = parts[1];
             simpleId = sequence5Digit.slice(-4);
         }
-        
         return `<svg id="barcode-${id}"></svg><span class="simple-id">${simpleId}</span>`;
     }
 
@@ -568,8 +647,7 @@
         }
     }
 
-    // --- Document Logging (Unchanged) ---
-
+    // Document Logging
     function getCurrentDateTime() {
         const now = new Date();
         const date = now.toISOString().slice(0, 10);
@@ -577,7 +655,7 @@
         return `${date} ${time}`;
     }
 
-    function logNewDocument() {
+    async function logNewDocument() {
         const type = document.getElementById('docType').value;
         const source = document.getElementById('sourceOffice').value;
         const initialDestination = document.getElementById('forwarderOffice').value;
@@ -589,6 +667,7 @@
             return false;
         }
         
+        // ID Generation must happen BEFORE saving, as it increments the global sequence
         const docId = generateTrackingID();
         const currentUser = getCurrentUser();
         const currentOffice = getCurrentOffice();
@@ -610,22 +689,23 @@
 
         documents.push(newDoc);
         document.getElementById('documentForm').reset();
-        saveDocuments(); 
+        
+        await saveDocuments(); // Save to cloud
+        
         displayDocuments();
 
         alert(`✅ NEW Document successfully logged by ${currentUser} (${currentOffice})! Generated Tracking ID: ${docId}`);
         return true;
     }
 
-    // --- Action Logic (UPDATED to use central list for prompt) ---
-
-    function handleAction(actionType) {
+    // Action Logic
+    async function handleAction(actionType) {
         const docIdInput = document.getElementById('docId');
         const docId = docIdInput.value.trim().toUpperCase();
         docIdInput.value = ''; 
 
         if (actionType === 'NEW_DOC') {
-            logNewDocument();
+            await logNewDocument();
             return;
         }
 
@@ -657,7 +737,6 @@
 
         if (action && action.toUpperCase() === 'RELEASE') {
             
-            // USE CENTRAL LIST, excluding admin view
             const functionalOffices = OFFICE_OPTIONS.filter(o => o !== "All Offices");
             const officeList = functionalOffices.join('\n- ');
             
@@ -668,7 +747,6 @@
                 const validOffice = functionalOffices.find(o => o.toUpperCase() === newOffice.toUpperCase());
 
                 if (validOffice) {
-                    // Log the movement (Release from current office to new office)
                     doc.history.push({
                         timestamp: getCurrentDateTime(),
                         action: 'Released/Forwarded',
@@ -677,7 +755,7 @@
                         loggedOffice: currentUserOffice
                     });
                     
-                    saveDocuments(); 
+                    await saveDocuments(); 
                     alert(`✅ Document ID ${docId} has been **RELEASED** by ${currentUserOffice} and forwarded to: ${validOffice}.`);
                 } else {
                     alert(`❌ Error: Invalid office name entered ("${newOffice}"). Please choose an existing office from the list.`);
@@ -687,7 +765,6 @@
             }
         } 
         else if (action && action.toUpperCase() === 'COMPLETE') {
-             // Log the final status
             doc.history.push({
                 timestamp: getCurrentDateTime(),
                 action: 'Completed/Archived',
@@ -695,14 +772,14 @@
                 loggedBy: getCurrentUser(),
                 loggedOffice: currentUserOffice
             });
-            saveDocuments();
+            await saveDocuments();
             alert(`✅ Document ID ${docId} has been **COMPLETED** and marked for Archive by ${currentUserOffice}.`);
         }
         else if (action && action.toUpperCase() === 'DELETE') {
             const confirmDelete = confirm(`Are you sure you want to DELETE Document ID ${docId}? This action cannot be undone. Logged by: ${getCurrentUser()}`);
             if (confirmDelete) {
                 documents.splice(docIndex, 1);
-                saveDocuments(); 
+                await saveDocuments(); 
                 alert(`🗑️ Document ID ${docId} has been DELETED by ${getCurrentUser()}.`);
             }
         } else {
@@ -713,8 +790,7 @@
     }
 
 
-    // --- Table Rendering (Unchanged) ---
-
+    // Table Rendering (Unchanged)
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
         listBody.innerHTML = '';
@@ -722,7 +798,6 @@
         const currentOffice = getCurrentOffice();
         const today = new Date().toISOString().slice(0, 10);
 
-        // Helper function to get the current status from the history array
         const getCurrentStatus = (doc) => {
             if (!doc.history || doc.history.length === 0) {
                 return { office: 'N/A', status: 'Error', loggedBy: 'N/A' };
@@ -736,73 +811,56 @@
             };
         };
 
-        // FILTERING LOGIC: Only show files currently at the user's office (or all for admin)
         const filteredDocuments = documents.filter(doc => {
             const status = getCurrentStatus(doc);
-            
-            // 1. Admin View (All Offices)
             if (currentOffice === 'All Offices') {
                 return true;
             }
-            // 2. Standard View (Only files currently destined for the user's office)
             return status.office === currentOffice;
         });
 
-        // Display the filtered documents (newest first)
         filteredDocuments.slice().reverse().forEach(doc => {
             const status = getCurrentStatus(doc);
             const row = listBody.insertRow();
             
-            // 1. Tracking ID
             row.insertCell().textContent = doc.id;
             
-            // 2. Barcode
             const barcodeCell = row.insertCell();
             barcodeCell.className = 'barcode-cell';
             barcodeCell.innerHTML = generateBarcodeSVG(doc.id);
 
-            // 3. Type / Subject
             row.insertCell().innerHTML = `<strong>${doc.type}</strong><br><small>${doc.docDetails}</small>`;
             
-            // 4. Source Office
             row.insertCell().textContent = doc.sourceOffice;
             
-            // 5. Initial Destination
             row.insertCell().textContent = doc.history[0].destinationOffice; 
             
-            // 6. Deadline (with overdue check)
             const deadlineCell = row.insertCell();
             deadlineCell.textContent = doc.deadline;
             
             let isOverdue = false;
-            // Check only if the status is NOT completed/archived
             if (doc.deadline && status.office !== 'COMPLETED/ARCHIVE' && doc.deadline < today) {
                 deadlineCell.classList.add('deadline-overdue');
                 isOverdue = true;
             }
             
-            // 7. Current Status
             const currentStatusCell = row.insertCell();
             
             let statusText = status.office;
             if (status.office === 'COMPLETED/ARCHIVE') {
                 statusText = 'FINALIZED';
-                currentStatusCell.style.backgroundColor = '#d1e7dd'; /* Light green for completed */
+                currentStatusCell.style.backgroundColor = '#d1e7dd'; 
             } else if (isOverdue) {
-                currentStatusCell.style.backgroundColor = '#f8d7da'; /* Light red for overdue */
+                currentStatusCell.style.backgroundColor = '#f8d7da'; 
             } else if (status.office === currentOffice) {
-                currentStatusCell.style.backgroundColor = '#fff3cd'; /* Light yellow/orange highlight */
+                currentStatusCell.style.backgroundColor = '#fff3cd'; 
             }
 
-            // Display current status and who processed the last action
             currentStatusCell.innerHTML = `<strong>${statusText}</strong><br><small>Last Action: ${status.action} by ${status.loggedBy}</small>`;
             
-            
-            // 8. Log History Button
             const historyCell = row.insertCell();
             historyCell.innerHTML = `<button onclick="openModal('${doc.id}')">View Log</button>`;
             
-            // Render barcode after the cell is added to the DOM
             setTimeout(() => renderBarcode(doc.id), 0);
         });
         
@@ -811,11 +869,10 @@
         }
     }
 
-    // --- Initialization: Load and Display Documents on page load ---
-    document.addEventListener('DOMContentLoaded', () => {
-        populateOfficeDropdowns(); // Populate dropdowns first
-        loadDocuments();
-        console.log(`[Document Tracker] Loaded ${documents.length} documents from Local Storage.`);
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        populateOfficeDropdowns(); 
+        await loadDocuments(); // Load data from cloud first
         checkLogin(); 
     });
 </script>
