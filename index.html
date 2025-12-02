@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated Tracker (YYYY-SSSSS)</title>
+    <title>Automated Tracker (YYYY-SSSSS) - Continuous Log</title>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
@@ -45,7 +45,7 @@
             width: 90%;
         }
         .login-box h2 { color: #007bff; margin-top: 0; }
-        .login-box select, .login-box input {
+        .login-box select, .login-box input[type="text"] {
             width: 100%;
             padding: 12px;
             margin: 8px 0;
@@ -71,7 +71,11 @@
         .form-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 30px; background-color: #e6f0ff; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { margin-bottom: 5px; font-weight: bold; color: #0056b3; }
-        .form-container input, .form-container select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .form-container input:not([type="date"]), .form-container select, .form-container input[type="date"] { 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+        }
         
         /* Action Panel */
         .action-panel { display: flex; flex-direction: column; gap: 20px; padding: 20px; border: 1px solid #ffc107; border-radius: 8px; margin-bottom: 30px; background-color: #fff8e1; }
@@ -126,10 +130,73 @@
         
         /* Logged By column width */
         #documentTable th:last-child { width: 100px; } 
+
+        /* History Modal Styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 700px; /* Increased modal width */
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .history-table th, .history-table td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+        .history-table th { background-color: #0056b3; color: white; }
+        
+        /* Deadline overdue status */
+        .deadline-overdue {
+            background-color: #ffcccc !important; /* Light red */
+            font-weight: bold;
+            color: #dc3545;
+        }
     </style>
 </head>
 <body>
 
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3 id="modalTitle">Document History Log</h3>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Date/Time</th>
+                    <th>Action</th>
+                    <th>To Office</th>
+                    <th>Processed By</th>
+                </tr>
+            </thead>
+            <tbody id="historyTableBody">
+                </tbody>
+        </table>
+    </div>
+</div>
 <div id="login-container">
     <div class="login-box">
         <h2>Document Tracker Access</h2>
@@ -145,7 +212,8 @@
             <option value="LTSP">LTSP</option>
             <option value="RECORDS">RECORDS</option>
             <option value="ARBDSP">ARBDSP</option>
-            <option value="All Offices">All Offices (Admin View)</option> </select>
+            <option value="All Offices">All Offices (Admin View)</option>
+        </select>
         
         <button onclick="attemptLogin()">Log In</button>
         <p style="font-size: 10px; color: #dc3545; margin-top: 20px;">
@@ -176,7 +244,7 @@
                 
                 <div class="action-buttons">
                     <button class="accept-btn" onclick="handleAction('NEW_DOC')">Create NEW Unique Document ID</button>
-                    <button class="release-btn" onclick="handleAction('RELEASE')">Release Document (Status Update)</button>
+                    <button class="release-btn" onclick="handleAction('RELEASE')">Release Document (Log New Step)</button>
                 </div>
             </div>
         </div>
@@ -214,7 +282,7 @@
             </div>
 
             <div class="form-group">
-                <label for="forwarderOffice">Forwarder Office (Initial Destination for New Log):</label> 
+                <label for="forwarderOffice">Initial Office Destination (First Stop):</label> 
                 <select id="forwarderOffice" required>
                     <option value="" disabled selected>Select Destination</option>
                     <option value="Legal Division">Legal Division</option>
@@ -226,13 +294,13 @@
             </div>
 
             <div class="form-group">
-                <label>Date Received (Auto-filled):</label>
-                <input type="text" disabled placeholder="Will be set upon Acceptance">
+                <label for="deadlineDate">Deadline Date (Calendar Picker):</label>
+                <input type="date" id="deadlineDate" required>
             </div>
             
             <div class="form-group">
-                <label>Date Released (Auto-filled on 'Release'):</label>
-                <input type="text" disabled placeholder="N/A">
+                <label>Date Logged (Auto-filled):</label>
+                <input type="text" disabled placeholder="Will be set upon New Document ID">
             </div>
         </div>
 
@@ -248,13 +316,12 @@
                 <tr>
                     <th>Tracking ID (YYYY-SSSSS)</th>
                     <th>Barcode</th>
-                    <th>Type</th>
+                    <th>Type / Subject</th>
                     <th>Source Office</th>
-                    <th>Date Received</th>
-                    <th>Last Destination / Current Office</th>
-                    <th>Date Released</th>
-                    <th>Status</th>
-                    <th>Logged By</th> 
+                    <th>Initial Destination</th>
+                    <th>Deadline</th>
+                    <th>Current Status</th>
+                    <th>Log History</th>
                 </tr>
             </thead>
             <tbody id="documentList">
@@ -265,13 +332,45 @@
 
 <script>
     // --- Data Storage Keys ---
-    const COUNTER_KEY = 'docTrackerSequenceAnnual'; // Key now checks annual reset
+    const COUNTER_KEY = 'docTrackerSequenceAnnual';
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
 
-    // --- Login/Session Functions (UPDATED) ---
+    // --- Modal Functions ---
+    function openModal(docId) {
+        const doc = documents.find(d => d.id === docId);
+        if (!doc) return;
+
+        document.getElementById('modalTitle').textContent = `History Log for ID: ${docId}`;
+        const historyBody = document.getElementById('historyTableBody');
+        historyBody.innerHTML = '';
+
+        doc.history.forEach(log => {
+            const row = historyBody.insertRow();
+            row.insertCell().textContent = log.timestamp;
+            row.insertCell().textContent = log.action;
+            row.insertCell().textContent = log.destinationOffice;
+            row.insertCell().textContent = `${log.loggedBy} (${log.loggedOffice})`;
+        });
+
+        document.getElementById('historyModal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('historyModal').style.display = 'none';
+    }
+
+    // Close modal when clicking outside of it
+    window.onclick = function(event) {
+        const modal = document.getElementById('historyModal');
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+
+    // --- Login/Session Functions ---
     function checkLogin() {
-        // Retrieve both name and office from session storage
         const loggedInName = sessionStorage.getItem('docTrackerName');
         const loggedInOffice = sessionStorage.getItem('docTrackerOffice');
 
@@ -279,13 +378,13 @@
             document.getElementById('loggedInUserDisplay').textContent = loggedInName;
             document.getElementById('loggedInOfficeDisplay').textContent = loggedInOffice;
             
-            // Set the dynamic table header
             const headerText = (loggedInOffice === 'All Offices') 
                 ? "Document Log (Showing ALL Files - Admin View)" 
                 : `Document Log (Showing Files for ${loggedInOffice})`;
             document.getElementById('tableHeader').textContent = headerText;
             
             showApp();
+            displayDocuments(); // Redraws table after login
         } else {
             showLogin();
         }
@@ -308,8 +407,6 @@
         if (name && office) {
             sessionStorage.setItem('docTrackerName', name); 
             sessionStorage.setItem('docTrackerOffice', office); 
-            
-            // Re-run checkLogin to update displays and filters
             checkLogin();
         } else {
             alert("Please enter your name and select your office.");
@@ -368,10 +465,10 @@
         }
     }
 
-    // --- Tracking ID Generation Logic (UPDATED for YYYY-SSSSS) ---
+    // --- Tracking ID Generation Logic (Annual Reset) ---
 
     function getCurrentYear() {
-        return new Date().getFullYear().toString(); // YYYY
+        return new Date().getFullYear().toString();
     }
 
     function getSequence() {
@@ -379,49 +476,40 @@
         let sequenceData = JSON.parse(localStorage.getItem(COUNTER_KEY));
         
         if (!sequenceData || sequenceData.year !== currentYear) {
-            // Reset counter if storage is empty or year has changed (Annual Reset)
             sequenceData = { year: currentYear, sequence: 0 };
         }
 
         sequenceData.sequence++;
         localStorage.setItem(COUNTER_KEY, JSON.stringify(sequenceData));
-        // Pad sequence to 5 digits (SSSSS)
         return String(sequenceData.sequence).padStart(5, '0');
     }
 
     function generateTrackingID() {
-        const currentYear = getCurrentYear(); // YYYY
-        const sequencePart = getSequence(); // SSSSS
-
-        // Format: YYYY-SSSSS
+        const currentYear = getCurrentYear();
+        const sequencePart = getSequence();
         return `${currentYear}-${sequencePart}`;
     }
     
-    // --- Barcode Functions (Updated to use YYYY-SSSSS split) ---
+    // --- Barcode Functions ---
 
     function generateBarcodeSVG(id) {
-        // Find the sequence part (SSSSS)
         const parts = id.split('-');
         let simpleId = 'N/A';
         
-        // If the ID is valid (e.g., 2026-00001)
         if (parts.length === 2) {
-            const sequence5Digit = parts[1]; // e.g., "00001"
-            // Get the last 4 digits
-            simpleId = sequence5Digit.slice(-4); // e.g., "0001"
+            const sequence5Digit = parts[1];
+            simpleId = sequence5Digit.slice(-4);
         }
         
-        // Encodes the FULL ID (YYYY-SSSSS) but displays the simple 4-digit sequence
         return `<svg id="barcode-${id}"></svg><span class="simple-id">${simpleId}</span>`;
     }
 
     function renderBarcode(id) {
         if (document.getElementById(`barcode-${id}`)) {
             try {
-                // IMPORTANT: Encoding the FULL unique ID is crucial for correct lookup
                 JsBarcode(`#barcode-${id}`, id, {
                     format: "CODE128", 
-                    displayValue: false, // Do NOT display the text inside the barcode image
+                    displayValue: false, 
                     width: 1.5, 
                     height: 50
                 });
@@ -431,36 +519,45 @@
         }
     }
 
-    // --- Document Logging (Unchanged) ---
+    // --- Document Logging (UPDATED to include deadline) ---
 
-    function getCurrentDateOnly() {
-        return new Date().toISOString().slice(0, 10);
+    function getCurrentDateTime() {
+        const now = new Date();
+        const date = now.toISOString().slice(0, 10);
+        const time = now.toTimeString().slice(0, 8);
+        return `${date} ${time}`;
     }
 
     function logNewDocument() {
         const type = document.getElementById('docType').value;
         const source = document.getElementById('sourceOffice').value;
-        const forwarder = document.getElementById('forwarderOffice').value;
+        const initialDestination = document.getElementById('forwarderOffice').value;
         const details = document.getElementById('docDetails').value.trim();
+        const deadline = document.getElementById('deadlineDate').value; // NEW
 
-        if (!type || !source || !forwarder || !details) {
-            alert(`To create a NEW document ID, you must fill out all required fields in the form below.`);
+        if (!type || !source || !initialDestination || !details || !deadline) {
+            alert(`To create a NEW document ID, you must fill out ALL required fields in the form below, including the Deadline.`);
             return false;
         }
         
         const docId = generateTrackingID();
+        const currentUser = getCurrentUser();
+        const currentOffice = getCurrentOffice();
 
         const newDoc = {
             id: docId, 
             type: type,
             sourceOffice: source,
-            dateReceived: getCurrentDateOnly(),
             docDetails: details,
-            dateReleased: '',
-            forwarderOffice: forwarder, 
-            status: "Received",
-            loggedBy: getCurrentUser(), // Logged by Name
-            loggedOffice: getCurrentOffice() // Logged by Office
+            deadline: deadline, // NEW FIELD
+            // History array stores all movement/status changes
+            history: [{
+                timestamp: getCurrentDateTime(),
+                action: 'Received (Initial Log)',
+                destinationOffice: initialDestination,
+                loggedBy: currentUser,
+                loggedOffice: currentOffice
+            }]
         };
 
         documents.push(newDoc);
@@ -468,11 +565,11 @@
         saveDocuments(); 
         displayDocuments();
 
-        alert(`✅ NEW Document successfully logged by ${getCurrentUser()} (${getCurrentOffice()})! Generated Tracking ID: ${docId}`);
+        alert(`✅ NEW Document successfully logged by ${currentUser} (${currentOffice})! Generated Tracking ID: ${docId}`);
         return true;
     }
 
-    // --- Action Logic (Updated to use getCurrentOffice for logging) ---
+    // --- Action Logic (Unchanged in core logic) ---
 
     function handleAction(actionType) {
         const docIdInput = document.getElementById('docId');
@@ -497,43 +594,64 @@
         }
 
         const doc = documents[docIndex];
+        const currentUserOffice = getCurrentOffice();
         
-        const action = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\nEnter 'RELEASE' to set the release date and specify a new office.\nEnter 'DELETE' to remove this document from the log.`);
+        // Find the current destination/status
+        const lastLog = doc.history[doc.history.length - 1];
+        const currentDestination = lastLog.destinationOffice;
+        
+        // SECURITY CHECK: Only the office currently holding the file can release it (unless admin)
+        if (currentUserOffice !== 'All Offices' && currentDestination !== currentUserOffice) {
+            alert(`❌ ACCESS DENIED: This file is currently logged to be at ${currentDestination}. Only that office can perform the Release action.`);
+            return;
+        }
+
+        const action = prompt(`Document ID ${docId} is currently logged to be at **${currentDestination}**.\n\nEnter 'RELEASE' to log the document's movement to the next office.\nEnter 'COMPLETE' to mark the file as finalized/completed by your office.\nEnter 'DELETE' to remove this document from the log.`);
 
         if (action && action.toUpperCase() === 'RELEASE') {
             
-            if (doc.status === 'Released') {
-                alert(`⚠️ Document ID ${docId} is ALREADY RELEASED. No action taken.`);
-                return;
-            }
-            
-            // Use the list of offices defined in the New Document Details form
             const officeSelect = document.getElementById('forwarderOffice');
             const options = Array.from(officeSelect.options).filter(opt => opt.value !== '').map(opt => opt.value);
             const officeList = options.join('\n- ');
             
-            let newOffice = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\n***RELEASE ACTION: Select New Destination***\n\nEnter the **EXACT** name of the New Destination Office:\n\nAvailable Offices:\n- ${officeList}`);
+            let newOffice = prompt(`***RELEASE ACTION: Select New Destination***\n\nEnter the **EXACT** name of the New Destination Office:\n\nAvailable Offices:\n- ${officeList}`);
 
             if (newOffice) {
                 newOffice = newOffice.trim();
                 const validOffice = options.find(o => o.toUpperCase() === newOffice.toUpperCase());
 
                 if (validOffice) {
-                    doc.dateReleased = getCurrentDateOnly();
-                    doc.forwarderOffice = validOffice; 
-                    doc.status = 'Released';
-                    doc.loggedBy = getCurrentUser(); 
-                    doc.loggedOffice = getCurrentOffice();
+                    // Log the movement (Release from current office to new office)
+                    doc.history.push({
+                        timestamp: getCurrentDateTime(),
+                        action: 'Released/Forwarded',
+                        destinationOffice: validOffice,
+                        loggedBy: getCurrentUser(),
+                        loggedOffice: currentUserOffice
+                    });
+                    
                     saveDocuments(); 
-                    alert(`✅ Document ID ${docId} has been **RELEASED** by ${getCurrentUser()} (${getCurrentOffice()}) and forwarded to: ${validOffice}.`);
+                    alert(`✅ Document ID ${docId} has been **RELEASED** by ${currentUserOffice} and forwarded to: ${validOffice}.`);
                 } else {
                     alert(`❌ Error: Invalid office name entered ("${newOffice}"). Please choose an existing office from the list.`);
                 }
             } else {
                 alert("Release action cancelled.");
             }
-
-        } else if (action && action.toUpperCase() === 'DELETE') {
+        } 
+        else if (action && action.toUpperCase() === 'COMPLETE') {
+             // Log the final status
+            doc.history.push({
+                timestamp: getCurrentDateTime(),
+                action: 'Completed/Archived',
+                destinationOffice: 'COMPLETED/ARCHIVE',
+                loggedBy: getCurrentUser(),
+                loggedOffice: currentUserOffice
+            });
+            saveDocuments();
+            alert(`✅ Document ID ${docId} has been **COMPLETED** and marked for Archive by ${currentUserOffice}.`);
+        }
+        else if (action && action.toUpperCase() === 'DELETE') {
             const confirmDelete = confirm(`Are you sure you want to DELETE Document ID ${docId}? This action cannot be undone. Logged by: ${getCurrentUser()}`);
             if (confirmDelete) {
                 documents.splice(docIndex, 1);
@@ -548,68 +666,101 @@
     }
 
 
-    // --- Table Rendering (UPDATED for Filtering) ---
+    // --- Table Rendering (UPDATED for Filtering and new columns) ---
 
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
         listBody.innerHTML = '';
         
         const currentOffice = getCurrentOffice();
-        
-        // FILTERING LOGIC
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Helper function to get the current status from the history array
+        const getCurrentStatus = (doc) => {
+            if (!doc.history || doc.history.length === 0) {
+                return { office: 'N/A', status: 'Error', loggedBy: 'N/A' };
+            }
+            const lastLog = doc.history[doc.history.length - 1];
+            return {
+                office: lastLog.destinationOffice,
+                status: lastLog.action,
+                loggedBy: `${lastLog.loggedBy} (${lastLog.loggedOffice})`,
+                timestamp: lastLog.timestamp 
+            };
+        };
+
+        // FILTERING LOGIC: Only show files currently at the user's office (or all for admin)
         const filteredDocuments = documents.filter(doc => {
-            // If the user selects 'All Offices', show everything (Admin View)
+            const status = getCurrentStatus(doc);
+            
+            // 1. Admin View (All Offices)
             if (currentOffice === 'All Offices') {
                 return true;
             }
-            // Otherwise, only show documents currently destined for the user's office.
-            // Note: If the document is already "Released" and sent to a *different* office, it won't show up here,
-            // as its current destination (`forwarderOffice`) should reflect the next step.
-            return doc.forwarderOffice === currentOffice;
+            // 2. Standard View (Only files currently destined for the user's office)
+            return status.office === currentOffice;
         });
 
         // Display the filtered documents (newest first)
         filteredDocuments.slice().reverse().forEach(doc => {
+            const status = getCurrentStatus(doc);
             const row = listBody.insertRow();
             
+            // 1. Tracking ID
             row.insertCell().textContent = doc.id;
             
+            // 2. Barcode
             const barcodeCell = row.insertCell();
             barcodeCell.className = 'barcode-cell';
             barcodeCell.innerHTML = generateBarcodeSVG(doc.id);
 
-            row.insertCell().textContent = doc.type;
-            row.insertCell().textContent = doc.sourceOffice;
-            row.insertCell().textContent = doc.dateReceived;
+            // 3. Type / Subject
+            row.insertCell().innerHTML = `<strong>${doc.type}</strong><br><small>${doc.docDetails}</small>`;
             
-            // Highlight the current destination if it matches the logged-in office (Visual cue)
-            const destinationCell = row.insertCell();
-            destinationCell.textContent = doc.forwarderOffice; 
-            if (doc.forwarderOffice === currentOffice) {
-                destinationCell.style.backgroundColor = '#d4edda'; // Light green highlight
+            // 4. Source Office
+            row.insertCell().textContent = doc.sourceOffice;
+            
+            // 5. Initial Destination
+            row.insertCell().textContent = doc.history[0].destinationOffice; 
+            
+            // 6. Deadline (with overdue check)
+            const deadlineCell = row.insertCell();
+            deadlineCell.textContent = doc.deadline;
+            
+            let isOverdue = false;
+            // Check only if the status is NOT completed/archived
+            if (doc.deadline && status.office !== 'COMPLETED/ARCHIVE' && doc.deadline < today) {
+                deadlineCell.classList.add('deadline-overdue');
+                isOverdue = true;
+            }
+            
+            // 7. Current Status
+            const currentStatusCell = row.insertCell();
+            
+            let statusText = status.office;
+            if (status.office === 'COMPLETED/ARCHIVE') {
+                statusText = 'FINALIZED';
+                currentStatusCell.style.backgroundColor = '#d1e7dd'; /* Light green for completed */
+            } else if (isOverdue) {
+                currentStatusCell.style.backgroundColor = '#f8d7da'; /* Light red for overdue */
+            } else if (status.office === currentOffice) {
+                currentStatusCell.style.backgroundColor = '#fff3cd'; /* Light yellow/orange highlight */
             }
 
-            row.insertCell().textContent = doc.dateReleased || 'Pending';
+            // Display current status and who processed the last action
+            currentStatusCell.innerHTML = `<strong>${statusText}</strong><br><small>Last Action: ${status.action} by ${status.loggedBy}</small>`;
             
-            const statusCell = row.insertCell();
-            statusCell.textContent = doc.status;
-            statusCell.style.fontWeight = 'bold';
             
-            let statusColor = '#007bff'; 
-            if (doc.status === 'Received') statusColor = '#28a745'; 
-            if (doc.status === 'Released') statusColor = '#dc3545'; 
+            // 8. Log History Button
+            const historyCell = row.insertCell();
+            historyCell.innerHTML = `<button onclick="openModal('${doc.id}')">View Log</button>`;
             
-            statusCell.style.color = statusColor;
-            
-            // Display both Name and Office in the "Logged By" column
-            row.insertCell().textContent = `${doc.loggedBy} (${doc.loggedOffice})`; 
-
             // Render barcode after the cell is added to the DOM
             setTimeout(() => renderBarcode(doc.id), 0);
         });
         
         if (filteredDocuments.length === 0) {
-            listBody.innerHTML = `<tr style="color: #777;"><td colspan="9" style="text-align: center;">No documents currently received by the **${currentOffice}** office.</td></tr>`;
+            listBody.innerHTML = `<tr style="color: #777;"><td colspan="8" style="text-align: center;">No documents currently requiring action by the **${currentOffice}** office.</td></tr>`;
         }
     }
 
@@ -617,7 +768,6 @@
     document.addEventListener('DOMContentLoaded', () => {
         loadDocuments();
         console.log(`[Document Tracker] Loaded ${documents.length} documents from Local Storage.`);
-        // Call checkLogin, which in turn calls showApp and displayDocuments with filtering
         checkLogin(); 
     });
 </script>
