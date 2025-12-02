@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated Tracker (YYYY-MM-DD-SSSSS-HHMMSS)</title>
+    <title>Automated Tracker (YYYY-MM-SSSSS)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
@@ -88,8 +88,9 @@
         .barcode-cell .simple-id { 
             display: block; 
             font-weight: bold; 
-            font-size: 12px; 
-            margin-top: -5px; /* Pull text closer to the barcode */
+            font-size: 14px; 
+            margin-top: -5px; 
+            color: #007bff;
         }
         
         .persistence-controls { 
@@ -144,7 +145,7 @@
     <div class="container">
         
         <div class="app-header">
-            <h1 style="margin: 0;">Automated Document Tracker 📄</h1>
+            <h1 style="margin: 0;">Automated Document Tracker 📄 (ID Format: YYYY-MM-SSSSS)</h1>
             <p>
                 Logged in as: <span id="loggedInUserDisplay">N/A</span> 
                 <button class="logout-btn" onclick="logout()">Log Out</button>
@@ -156,8 +157,8 @@
 
             <div class="action-controls">
                 <div class="input-group">
-                    <label for="docId">Enter Full Tracking ID to Update/Release:</label>
-                    <input type="text" id="docId" placeholder="e.g., YYYY-MM-DD-SSSSS-HHMMSS">
+                    <label for="docId">Enter Full Tracking ID to Update/Release (e.g., YYYY-MM-SSSSS):</label>
+                    <input type="text" id="docId" placeholder="e.g., 2025-12-00001">
                 </div>
                 
                 <div class="action-buttons">
@@ -232,7 +233,7 @@
         <table id="documentTable">
             <thead>
                 <tr>
-                    <th>Tracking ID</th>
+                    <th>Tracking ID (YYYY-MM-SSSSS)</th>
                     <th>Barcode</th>
                     <th>Type</th>
                     <th>Source Office</th>
@@ -251,11 +252,11 @@
 
 <script>
     // --- Data Storage Keys ---
-    const COUNTER_KEY = 'docTrackerSequenceData';
+    const COUNTER_KEY = 'docTrackerSequenceMonthly'; // Key now checks monthly reset
     const DOCUMENTS_KEY = 'docTrackerDocuments'; 
     let documents = []; 
 
-    // --- Login/Session Functions ---
+    // --- Login/Session Functions (Unchanged) ---
     function checkLogin() {
         const loggedInOffice = sessionStorage.getItem('docTrackerUser');
         if (loggedInOffice) {
@@ -293,7 +294,7 @@
         return sessionStorage.getItem('docTrackerUser') || 'UNKNOWN';
     }
 
-    // --- Persistence Functions ---
+    // --- Persistence Functions (Unchanged) ---
     function loadDocuments() {
         try {
             const storedDocs = localStorage.getItem(DOCUMENTS_KEY);
@@ -329,50 +330,55 @@
         }
     }
 
-    // --- Tracking ID Generation Logic ---
+    // --- Tracking ID Generation Logic (Monthly Reset) ---
 
-    function getCurrentDateOnly() {
-        return new Date().toISOString().slice(0, 10);
+    function getCurrentYearMonth() {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}`; // YYYY-MM
     }
 
     function getSequence() {
-        const today = getCurrentDateOnly(); 
+        const currentMonthYear = getCurrentYearMonth(); 
         let sequenceData = JSON.parse(localStorage.getItem(COUNTER_KEY));
         
-        if (!sequenceData || sequenceData.date !== today) {
-            sequenceData = { date: today, sequence: 0 };
+        // Use the current date for time-based components
+        const currentDate = new Date();
+        
+        if (!sequenceData || sequenceData.monthYear !== currentMonthYear) {
+            // Reset counter if storage is empty or month/year has changed
+            sequenceData = { monthYear: currentMonthYear, sequence: 0 };
         }
 
         sequenceData.sequence++;
         localStorage.setItem(COUNTER_KEY, JSON.stringify(sequenceData));
+        // Pad sequence to 5 digits (SSSSS)
         return String(sequenceData.sequence).padStart(5, '0');
     }
 
     function generateTrackingID() {
-        const today = getCurrentDateOnly(); 
-        const sequencePart = getSequence(); 
-        
-        const date = new Date();
-        const hour = String(date.getHours()).padStart(2, '0');
-        const minute = String(date.getMinutes()).padStart(2, '0');
-        const second = String(date.getSeconds()).padStart(2, '0');
-        const timePart = `${hour}${minute}${second}`;
+        const currentMonthYear = getCurrentYearMonth(); // YYYY-MM
+        const sequencePart = getSequence(); // SSSSS
 
-        // Format: YYYY-MM-DD-SSSSS-HHMMSS
-        return `${today}-${sequencePart}-${timePart}`;
+        // Format: YYYY-MM-SSSSS
+        return `${currentMonthYear}-${sequencePart}`;
     }
     
-    // --- Barcode Functions (Updated) ---
+    // --- Barcode Functions (UPDATED FOR 4-DIGIT DISPLAY) ---
 
     function generateBarcodeSVG(id) {
-        // Extract the 5-digit sequence part (SSSSS) for simple display
+        // Find the sequence part (SSSSS)
         const parts = id.split('-');
         let simpleId = 'N/A';
-        if (parts.length >= 3) {
-            simpleId = parts[2]; // This is the SSSSS part
+        
+        if (parts.length === 3) {
+            const sequence5Digit = parts[2]; // e.g., "00005"
+            // Get the last 4 digits
+            simpleId = sequence5Digit.slice(-4); // e.g., "0005"
         }
         
-        // Encode the FULL ID (for uniqueness) but display the simple ID (for simplicity)
+        // Encodes the FULL ID (YYYY-MM-SSSSS) but displays the simple 4-digit sequence
         return `<svg id="barcode-${id}"></svg><span class="simple-id">${simpleId}</span>`;
     }
 
@@ -392,7 +398,11 @@
         }
     }
 
-    // --- Document Logging ---
+    // --- Document Logging (Unchanged) ---
+
+    function getCurrentDateOnly() {
+        return new Date().toISOString().slice(0, 10);
+    }
 
     function logNewDocument() {
         const type = document.getElementById('docType').value;
@@ -428,7 +438,7 @@
         return true;
     }
 
-    // --- Action Logic (New Document / Release) ---
+    // --- Action Logic (New Document / Release) (Unchanged) ---
 
     function handleAction(actionType) {
         const docIdInput = document.getElementById('docId');
@@ -502,7 +512,7 @@
     }
 
 
-    // --- Table Rendering ---
+    // --- Table Rendering (Unchanged) ---
 
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
