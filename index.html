@@ -3,17 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Status Tracker (26-MM-XXXX Format) - With Manual Persistence</title>
+    <title>Document Status Tracker (26-MM-XXXX Format) - With Login</title>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f7f7f7; }
+        body { font-family: Arial, sans-serif; margin: 0; background-color: #f7f7f7; }
         .container { max-width: 1400px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-        h1 { color: #007bff; text-align: center; margin-bottom: 25px; }
+        h1 { color: #007bff; text-align: center; margin-bottom: 5px; }
         
-        /* Form Container (3 columns) */
+        /* Header for Username and Controls */
+        .app-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 2px solid #007bff; margin-bottom: 20px; }
+        .app-header p { margin: 0; font-weight: bold; color: #333; }
+        .app-header span { color: #dc3545; }
+        .logout-btn { background-color: #6c757d; color: white; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .logout-btn:hover { background-color: #5a6268; }
+
+        /* Login Screen Styling */
+        #login-container {
+            display: none; /* Controlled by JS */
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #e6f0ff;
+        }
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+        }
+        .login-box h2 { color: #007bff; margin-top: 0; }
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .login-box button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .login-box button:hover { background-color: #218838; }
+
+        /* Rest of the Existing Styles */
         .form-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 30px; background-color: #e6f0ff; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { margin-bottom: 5px; font-weight: bold; color: #0056b3; }
@@ -64,112 +109,137 @@
         #saveDataBtn:hover { background-color: #e0a800; }
         #clearDataBtn { background-color: #6c757d; color: white; }
         #clearDataBtn:hover { background-color: #5a6268; }
+        
+        /* Logged By column width */
+        #documentTable th:last-child { width: 100px; } 
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Document Status Tracker (26-MM-XXXX Format) 📄</h1>
+<div id="login-container">
+    <div class="login-box">
+        <h2>Document Tracker Access</h2>
+        <p>Please enter your **Username** to use the system and log changes.</p>
+        <input type="text" id="usernameInput" placeholder="Enter your name or initials (e.g., JDELA CRUZ)">
+        <button onclick="attemptLogin()">Log In</button>
+        <p style="font-size: 10px; color: #dc3545; margin-top: 20px;">
+            ⚠️ This is for internal logging only. No password required.
+        </p>
+    </div>
+</div>
 
-    <div class="scanner-panel">
-        <h2>Barcode Scanner & Status Update</h2>
+<div id="app-container" style="display:none;">
+    <div class="container">
+        
+        <div class="app-header">
+            <h1 style="margin: 0;">Document Status Tracker 📄</h1>
+            <p>
+                Logged in as: <span id="loggedInUserDisplay">N/A</span> 
+                <button class="logout-btn" onclick="logout()">Log Out</button>
+            </p>
+        </div>
 
-        <div id="reader"></div> <p id="scannerMessage" style="text-align: center; font-weight: bold; color: #555;">Scanner stopped. Click 'Start Scanner' to activate your camera and grant permission.</p>
+        <div class="scanner-panel">
+            <h2>Barcode Scanner & Status Update</h2>
 
-        <div class="scanner-controls">
-            <button id="startScanBtn" class="start-btn" onclick="startScanner()">Start Scanner</button>
-            <button id="stopScanBtn" class="release-btn" onclick="stopScanner()" style="display: none;">Stop Scanner</button>
-            
-            <div class="input-group" style="flex-grow: 1;">
-                <label for="scannerId">Decoded Tracking ID / Manual Entry:</label>
-                <input type="text" id="scannerId" placeholder="ID appears here (e.g., 26-12-0001)">
+            <div id="reader"></div> 
+            <p id="scannerMessage" style="text-align: center; font-weight: bold; color: #555;">Scanner stopped. Click 'Start Scanner' to activate your camera and grant permission.</p>
+
+            <div class="scanner-controls">
+                <button id="startScanBtn" class="start-btn" onclick="startScanner()">Start Scanner</button>
+                <button id="stopScanBtn" class="release-btn" onclick="stopScanner()" style="display: none;">Stop Scanner</button>
+                
+                <div class="input-group" style="flex-grow: 1;">
+                    <label for="scannerId">Decoded Tracking ID / Manual Entry:</label>
+                    <input type="text" id="scannerId" placeholder="ID appears here (e.g., 26-12-0001)">
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="accept-btn" onclick="handleScanAction('ACCEPT')">Accept Document (Initial Log/Update)</button>
+                    <button class="release-btn" onclick="handleScanAction('RELEASE')">Release Document (Status Update)</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="documentForm" class="form-container">
+            <h2>New Document Details (Required for Initial Log)</h2>
+            <div class="form-group">
+                <label for="docType">Document Type:</label>
+                <select id="docType" required>
+                    <option value="" disabled selected>Select Type</option>
+                    <option value="Memorandum">Memorandum</option>
+                    <option value="Request">Request</option>
+                    <option value="Complaint">Complaint</option>
+                    <option value="Letter">Letter</option>
+                    <option value="PSO">PSO</option>
+                    <option value="Certificate">Certificate</option>
+                </select>
             </div>
             
-            <div class="action-buttons">
-                <button class="accept-btn" onclick="handleScanAction('ACCEPT')">Accept Document (Initial Log/Update)</button>
-                <button class="release-btn" onclick="handleScanAction('RELEASE')">Release Document (Status Update)</button>
+            <div class="form-group">
+                <label for="sourceOffice">Source Office:</label>
+                <select id="sourceOffice" required>
+                    <option value="" disabled selected>Select Source</option>
+                    <option value="Legal Division">Legal Division</option>
+                    <option value="Planning Section">Planning Section</option>
+                    <option value="Finance Unit">Finance Unit</option>
+                    <option value="Regional Office V">Regional Office V</option>
+                    <option value="Central Office">Central Office</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="docDetails">Brief Subject/Details:</label>
+                <input type="text" id="docDetails" required>
+            </div>
+
+            <div class="form-group">
+                <label for="forwarderOffice">Forwarder Office (Initial Destination for New Log):</label> 
+                <select id="forwarderOffice" required>
+                    <option value="" disabled selected>Select Destination</option>
+                    <option value="Legal Division">Legal Division</option>
+                    <option value="Planning Section">Planning Section</option>
+                    <option value="Finance Unit">Finance Unit</option>
+                    <option value="Regional Office V">Regional Office V</option>
+                    <option value="Records Section">Records Section</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Date Received (Auto-filled on 'Accept'):</label>
+                <input type="text" disabled placeholder="Will be set upon Acceptance">
+            </div>
+            
+            <div class="form-group">
+                <label>Date Released (Auto-filled on 'Release'):</label>
+                <input type="text" disabled placeholder="N/A">
             </div>
         </div>
-    </div>
 
-    <div id="documentForm" class="form-container">
-        <h2>New Document Details (Required for Initial Log)</h2>
-        <div class="form-group">
-            <label for="docType">Document Type:</label>
-            <select id="docType" required>
-                <option value="" disabled selected>Select Type</option>
-                <option value="Memorandum">Memorandum</option>
-                <option value="Travel Order">Travel Orde</option>
-                <option value="Complaint">Complaint</option>
-                <option value="Letter">Letter</option>
-                <option value="PSO">PSO</option>
-                <option value="Certificate">Certificate</option>
-            </select>
-        </div>
+        <h2>Document Log</h2>
         
-        <div class="form-group">
-            <label for="sourceOffice">Source Office:</label>
-            <select id="sourceOffice" required>
-                <option value="" disabled selected>Select Source</option>
-                <option value="Legal Division">Legal Division</option>
-                <option value="STOD">STOD</option>
-                <option value="LTSP">LTSP</option>
-                <option value="ARBDSP">ARBDSP</option>
-                <option value="Records">Records</option>
-            </select>
+        <div class="persistence-controls">
+            <button id="saveDataBtn" onclick="saveDocuments()">Manually Save Log 💾</button>
+            <button id="clearDataBtn" onclick="clearDocuments()">Clear All Log Data ⚠️</button>
         </div>
 
-        <div class="form-group">
-            <label for="docDetails">Brief Subject/Details:</label>
-            <input type="text" id="docDetails" required>
-        </div>
-
-        <div class="form-group">
-            <label for="forwarderOffice">Forwarder Office (Initial Destination for New Log):</label> 
-            <select id="forwarderOffice" required>
-                <option value="" disabled selected>Select Destination</option>
-                <option value="Legal Division">Legal Division</option>
-                <option value="Planning Section">Planning Section</option>
-                <option value="Finance Unit">Finance Unit</option>
-                <option value="Regional Office V">Regional Office V</option>
-                <option value="Records Section">Records Section</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Date Received (Auto-filled on 'Accept'):</label>
-            <input type="text" disabled placeholder="Will be set upon Acceptance">
-        </div>
-        
-        <div class="form-group">
-            <label>Date Released (Auto-filled on 'Release'):</label>
-            <input type="text" disabled placeholder="N/A">
-        </div>
+        <table id="documentTable">
+            <thead>
+                <tr>
+                    <th>Tracking ID</th>
+                    <th>Barcode</th>
+                    <th>Type</th>
+                    <th>Source Office</th>
+                    <th>Date Received</th>
+                    <th>Last Destination / Current Office</th>
+                    <th>Date Released</th>
+                    <th>Status</th>
+                    <th>Logged By</th> </tr>
+            </thead>
+            <tbody id="documentList">
+                </tbody>
+        </table>
     </div>
-
-    <h2>Document Log</h2>
-    
-    <div class="persistence-controls">
-        <button id="saveDataBtn" onclick="saveDocuments()">Manually Save Log 💾</button>
-        <button id="clearDataBtn" onclick="clearDocuments()">Clear All Log Data ⚠️</button>
-    </div>
-
-    <table id="documentTable">
-        <thead>
-            <tr>
-                <th>Tracking ID</th>
-                <th>Barcode</th>
-                <th>Type</th>
-                <th>Source Office</th>
-                <th>Date Received</th>
-                <th>Last Destination / Current Office</th>
-                <th>Date Released</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody id="documentList">
-            </tbody>
-    </table>
 </div>
 
 <script>
@@ -179,13 +249,57 @@
     let documents = []; 
     let html5QrCode = null; 
 
+    // --- Login/Session Functions ---
+    
+    function checkLogin() {
+        const loggedInUser = sessionStorage.getItem('docTrackerUser');
+        if (loggedInUser) {
+            document.getElementById('loggedInUserDisplay').textContent = loggedInUser;
+            showApp();
+        } else {
+            showLogin();
+        }
+    }
+
+    function showApp() {
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('app-container').style.display = 'block';
+    }
+
+    function showLogin() {
+        document.getElementById('login-container').style.display = 'flex';
+        document.getElementById('app-container').style.display = 'none';
+    }
+
+    function attemptLogin() {
+        const username = document.getElementById('usernameInput').value.trim().toUpperCase();
+        if (username) {
+            sessionStorage.setItem('docTrackerUser', username);
+            document.getElementById('loggedInUserDisplay').textContent = username;
+            showApp();
+        } else {
+            alert("Please enter a username.");
+        }
+    }
+
+    function logout() {
+        if (confirm("Are you sure you want to log out?")) {
+            sessionStorage.removeItem('docTrackerUser');
+            showLogin();
+        }
+    }
+
+    function getCurrentUser() {
+        // Retrieve username for logging purposes
+        return sessionStorage.getItem('docTrackerUser') || 'UNKNOWN';
+    }
+
     // --- Persistence Functions (Robust) ---
 
     function loadDocuments() {
         try {
             const storedDocs = localStorage.getItem(DOCUMENTS_KEY);
             if (storedDocs) {
-                // Ensure the loaded data is an array
                 const parsedDocs = JSON.parse(storedDocs);
                 if (Array.isArray(parsedDocs)) {
                     documents = parsedDocs;
@@ -193,20 +307,30 @@
             }
         } catch (e) {
             console.error("Error loading documents from Local Storage:", e);
-            alert("Warning: Could not load previous log data from Local Storage. The file might be blocked from accessing storage.");
+            // Alert removed as it's not needed when running on a proper web server (GitHub Pages)
         }
     }
 
     function saveDocuments() {
         try {
             localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
-            alert("Log data successfully saved to browser's local storage.");
+            // Alert removed from auto-save/update process for better user experience
         } catch (e) {
             console.error("Error saving documents to Local Storage:", e);
-            alert("Error: Could not save log data to Local Storage. Please check your browser's security settings (file:// restrictions).");
         }
     }
     
+    // Manual save function (retains alert)
+    function manualSaveDocuments() {
+         try {
+            localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(documents));
+            alert("Log data successfully saved to browser's local storage.");
+        } catch (e) {
+            console.error("Error saving documents to Local Storage:", e);
+            alert("Error: Could not save log data to Local Storage.");
+        }
+    }
+
     function clearDocuments() {
         if (confirm("WARNING: This will permanently DELETE ALL logged documents and reset the tracking ID counter. Are you sure?")) {
             localStorage.removeItem(DOCUMENTS_KEY);
@@ -245,7 +369,6 @@
     }
 
     function renderBarcode(id) {
-        // Only render if the element exists to avoid errors
         if (document.getElementById(`barcode-${id}`)) {
             try {
                 JsBarcode(`#barcode-${id}`, id, {
@@ -279,16 +402,17 @@
             dateReceived: getCurrentDateOnly(),
             docDetails: details,
             dateReleased: '',
-            forwarderOffice: forwarder, // Initial destination/Current Office
-            status: "Received" 
+            forwarderOffice: forwarder, 
+            status: "Received",
+            loggedBy: getCurrentUser() 
         };
 
         documents.push(newDoc);
         document.getElementById('documentForm').reset();
-        saveDocuments(); // <--- SAVE
+        saveDocuments(); 
         displayDocuments();
 
-        alert(`✅ NEW Document successfully logged! Tracking ID: ${docId}`);
+        alert(`✅ NEW Document successfully logged by ${getCurrentUser()}! Tracking ID: ${docId}`);
         return true;
     }
 
@@ -297,21 +421,18 @@
     function handleScanAction(actionType) {
         const docIdInput = document.getElementById('scannerId');
         const docId = docIdInput.value.trim().toUpperCase();
-        docIdInput.value = ''; // Clear ID input after processing
+        docIdInput.value = ''; 
 
         if (html5QrCode && html5QrCode.isScanning) {
             stopScanner();
         }
         
-        // --- CASE 1: INITIAL LOG WITH SYSTEM ID (ID input is empty, and action is ACCEPT) ---
         if (!docId && actionType === 'ACCEPT') {
             const newSystemId = generateTrackingID();
             logNewDocument(newSystemId);
             return;
         }
 
-        // --- Check for ID if required for other actions (INCLUDING RELEASE) ---
-        // This confirms the 'Release Document' button looks for the barcode/ID
         if (!docId) {
             alert("Please scan or enter a Tracking ID to perform this action.");
             return;
@@ -319,11 +440,9 @@
         
         const docIndex = documents.findIndex(doc => doc.id === docId);
 
-        // --- CASE 2: ID IS FOUND (Show Release/Delete Pop-up) ---
         if (docIndex !== -1) {
             const doc = documents[docIndex];
             
-            // Using a prompt for multiple options (Release or Delete)
             const action = prompt(`Document ID ${docId} is currently **${doc.status.toUpperCase()}**.\n\nEnter 'RELEASE' to set the release date and specify a new office.\nEnter 'DELETE' to remove this document from the log.`);
 
             if (action && action.toUpperCase() === 'RELEASE') {
@@ -333,7 +452,6 @@
                     return;
                 }
                 
-                // LOGIC FOR RELEASE WITH NEW OFFICE
                 const officeSelect = document.getElementById('forwarderOffice');
                 const options = Array.from(officeSelect.options).filter(opt => opt.value !== '').map(opt => opt.value);
                 const officeList = options.join('\n- ');
@@ -345,12 +463,12 @@
                     const validOffice = options.find(o => o.toUpperCase() === newOffice.toUpperCase());
 
                     if (validOffice) {
-                        // Update the document
                         doc.dateReleased = getCurrentDateOnly();
                         doc.forwarderOffice = validOffice; 
                         doc.status = 'Released';
-                        saveDocuments(); // <--- SAVE
-                        alert(`✅ Document ID ${docId} has been **RELEASED** and forwarded to: ${validOffice}.`);
+                        doc.loggedBy = getCurrentUser(); 
+                        saveDocuments(); 
+                        alert(`✅ Document ID ${docId} has been **RELEASED** by ${getCurrentUser()} and forwarded to: ${validOffice}.`);
                     } else {
                         alert(`❌ Error: Invalid office name entered ("${newOffice}"). Please choose an existing office from the list.`);
                     }
@@ -359,12 +477,11 @@
                 }
 
             } else if (action && action.toUpperCase() === 'DELETE') {
-                // Existing delete logic
-                const confirmDelete = confirm(`Are you sure you want to DELETE Document ID ${docId}? This action cannot be undone.`);
+                const confirmDelete = confirm(`Are you sure you want to DELETE Document ID ${docId}? This action cannot be undone. Logged by: ${getCurrentUser()}`);
                 if (confirmDelete) {
                     documents.splice(docIndex, 1);
-                    saveDocuments(); // <--- SAVE
-                    alert(`🗑️ Document ID ${docId} has been DELETED.`);
+                    saveDocuments(); 
+                    alert(`🗑️ Document ID ${docId} has been DELETED by ${getCurrentUser()}.`);
                 }
             } else {
                 alert("Action cancelled or invalid option selected.");
@@ -374,7 +491,6 @@
             return;
         }
 
-        // --- CASE 3: ID IS NOT FOUND (Automatic Log or Error) ---
         if (docIndex === -1) {
             if (actionType === 'RELEASE') {
                 alert(`❌ Error: Document ID ${docId} not found. A document must be logged (Accepted) before it can be Released.`);
@@ -382,7 +498,6 @@
             }
             
             if (actionType === 'ACCEPT') {
-                // Automatically log a new document using the scanned ID
                 logNewDocument(docId);
             }
         }
@@ -464,7 +579,7 @@
             row.insertCell().textContent = doc.type;
             row.insertCell().textContent = doc.sourceOffice;
             row.insertCell().textContent = doc.dateReceived;
-            row.insertCell().textContent = doc.forwarderOffice; // Last Destination / Current Office
+            row.insertCell().textContent = doc.forwarderOffice; 
             row.insertCell().textContent = doc.dateReleased || 'Pending';
             
             const statusCell = row.insertCell();
@@ -476,13 +591,15 @@
             if (doc.status === 'Released') statusColor = '#dc3545'; 
             
             statusCell.style.color = statusColor;
+            
+            row.insertCell().textContent = doc.loggedBy || 'N/A'; // Display Logged By
 
             // Render barcode after the cell is added to the DOM
             setTimeout(() => renderBarcode(doc.id), 0);
         });
         
         if (documents.length === 0) {
-            listBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #777;">Start tracking your documents by clicking "Accept Document" after filling the form.</td></tr>';
+            listBody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #777;">Start tracking your documents by clicking "Accept Document" after filling the form.</td></tr>';
         }
     }
 
@@ -491,6 +608,7 @@
         loadDocuments();
         console.log(`[Document Tracker] Loaded ${documents.length} documents from Local Storage.`);
         displayDocuments();
+        checkLogin(); // Check for existing user session
     });
 </script>
 
