@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automated Tracker (YYYY-SSSSS) - Cloud Log</title>
+    <title>Automated Document Tracker (Cloud Log)</title>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
@@ -336,11 +336,10 @@
     // --------------------------------------------------------------------------------
     // --- IMPORTANT CONFIGURATION ---
     // --------------------------------------------------------------------------------
-    const ADMIN_PASSWORD = 'admin123'; // !!! CHANGE THIS PASSWORD !!!
+    const ADMIN_PASSWORD = 'admin123'; 
     
-    // !!! YOU MUST REPLACE THIS PLACEHOLDER URL !!!
-    // This is the URL of the Google Apps Script Web App you will deploy in the next step.
-    const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSTHj-ynnoz1ZWJGqCX0tTxgj2Pc8gO1YqeEQ2EXmoedt-PDGA5_LL-bHcWsU9HaZpAg/exec';
+    // !!! PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE (MUST END IN /exec) !!!
+    const API_ENDPOINT = 'YOUR_WEB_APP_URL';
     
     const OFFICE_OPTIONS = [
         "PARPO",
@@ -353,7 +352,6 @@
         "Finance Unit",
         "Regional Office V",
         "Central Office",
-        // The following is the admin view option
         "All Offices" 
     ];
 
@@ -412,7 +410,6 @@
     }
 
     // 2. SAVE DATA (POST request to GAS)
-    // The `manual` flag determines if we show a success message
     async function saveDocuments(manual = false) {
         showLoading();
         const dataToSend = {
@@ -463,7 +460,9 @@
     }
 
 
-    // --- Other Functions (Mostly Unchanged, but now rely on save/load) ---
+    // --------------------------------------------------------------------------------
+    // --- APP LOGIC (Unchanged from previous versions) ---
+    // --------------------------------------------------------------------------------
 
     // Dynamic Office Dropdown Population
     function populateOfficeDropdowns() {
@@ -530,8 +529,7 @@
         }
     }
 
-
-    // Login/Session Functions (Uses Session Storage for user session, but data is cloud-based)
+    // Login/Session Functions 
     function checkLogin() {
         const loggedInName = sessionStorage.getItem('docTrackerName');
         const loggedInOffice = sessionStorage.getItem('docTrackerOffice');
@@ -601,12 +599,10 @@
     }
 
 
-    // Tracking ID Generation Logic (Uses global variables managed by cloud)
-
+    // Tracking ID Generation Logic
     function getSequence() {
         const newYear = new Date().getFullYear().toString();
         
-        // Check for year change (resets sequence)
         if (currentYear !== newYear) {
             currentYear = newYear;
             currentSequence = 0;
@@ -621,7 +617,7 @@
         return `${currentYear}-${sequencePart}`;
     }
     
-    // Barcode Functions (Unchanged)
+    // Barcode Functions
     function generateBarcodeSVG(id) {
         const parts = id.split('-');
         let simpleId = 'N/A';
@@ -667,7 +663,6 @@
             return false;
         }
         
-        // ID Generation must happen BEFORE saving, as it increments the global sequence
         const docId = generateTrackingID();
         const currentUser = getCurrentUser();
         const currentOffice = getCurrentOffice();
@@ -690,7 +685,7 @@
         documents.push(newDoc);
         document.getElementById('documentForm').reset();
         
-        await saveDocuments(); // Save to cloud
+        await saveDocuments(); 
         
         displayDocuments();
 
@@ -727,7 +722,6 @@
         const lastLog = doc.history[doc.history.length - 1];
         const currentDestination = lastLog.destinationOffice;
         
-        // SECURITY CHECK
         if (currentUserOffice !== 'All Offices' && currentDestination !== currentUserOffice) {
             alert(`❌ ACCESS DENIED: This file is currently logged to be at ${currentDestination}. Only that office can perform the Release action.`);
             return;
@@ -790,7 +784,7 @@
     }
 
 
-    // Table Rendering (Unchanged)
+    // Table Rendering
     function displayDocuments() {
         const listBody = document.getElementById('documentList');
         listBody.innerHTML = '';
@@ -872,13 +866,10 @@
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', async () => {
         populateOfficeDropdowns(); 
-        await loadDocuments(); // Load data from cloud first
+        await loadDocuments(); 
         checkLogin(); 
     });
 </script>
 
 </body>
 </html>
-
-
-
